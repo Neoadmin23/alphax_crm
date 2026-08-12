@@ -1,0 +1,278 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "title_field": "prospect_name",
+ "field_order": [
+  "naming_series",
+  "prospect_name",
+  "company_name",
+  "column_break_head",
+  "status",
+  "prospect_owner",
+  "contact_section",
+  "email_id",
+  "mobile_no",
+  "phone",
+  "column_break_contact",
+  "source",
+  "territory",
+  "industry",
+  "city",
+  "job_title",
+  "followup_section",
+  "follow_up_date",
+  "last_contacted_on",
+  "follow_up_notes",
+  "activity_section",
+  "alphax_last_activity",
+  "alphax_last_activity_by",
+  "alphax_last_activity_type",
+  "alphax_last_activity_summary",
+  "alphax_idle_days",
+  "conversion_section",
+  "lead",
+  "converted",
+  "import_batch"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "PROS-.YYYY.-",
+   "default": "PROS-.YYYY.-",
+   "reqd": 1,
+   "print_hide": 1
+  },
+  {
+   "fieldname": "prospect_name",
+   "fieldtype": "Data",
+   "label": "Prospect / Contact Name",
+   "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "company_name",
+   "fieldtype": "Data",
+   "label": "Company",
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "column_break_head",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Link",
+   "label": "Status",
+   "options": "AlphaX Prospect Status",
+   "reqd": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "prospect_owner",
+   "fieldtype": "Link",
+   "label": "Prospect Owner (Sales Person)",
+   "options": "User",
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "contact_section",
+   "fieldtype": "Section Break",
+   "label": "Contact"
+  },
+  {
+   "fieldname": "email_id",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "mobile_no",
+   "fieldtype": "Data",
+   "label": "Mobile No"
+  },
+  {
+   "fieldname": "phone",
+   "fieldtype": "Data",
+   "label": "Phone"
+  },
+  {
+   "fieldname": "column_break_contact",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "source",
+   "fieldtype": "Link",
+   "label": "Source",
+   "options": "Lead Source"
+  },
+  {
+   "fieldname": "territory",
+   "fieldtype": "Link",
+   "label": "Territory",
+   "options": "Territory"
+  },
+  {
+   "fieldname": "industry",
+   "fieldtype": "Link",
+   "label": "Industry",
+   "options": "Industry Type"
+  },
+  {
+   "fieldname": "city",
+   "fieldtype": "Data",
+   "label": "City"
+  },
+  {
+   "fieldname": "job_title",
+   "fieldtype": "Data",
+   "label": "Job Title"
+  },
+  {
+   "fieldname": "followup_section",
+   "fieldtype": "Section Break",
+   "label": "Follow-up"
+  },
+  {
+   "fieldname": "follow_up_date",
+   "fieldtype": "Date",
+   "label": "Next Follow-up Date"
+  },
+  {
+   "fieldname": "last_contacted_on",
+   "fieldtype": "Datetime",
+   "label": "Last Contacted On"
+  },
+  {
+   "fieldname": "follow_up_notes",
+   "fieldtype": "Small Text",
+   "label": "Follow-up Notes"
+  },
+  {
+   "fieldname": "activity_section",
+   "fieldtype": "Section Break",
+   "label": "Activity Monitor",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "alphax_last_activity",
+   "fieldtype": "Datetime",
+   "label": "Last Activity",
+   "read_only": 1
+  },
+  {
+   "fieldname": "alphax_last_activity_by",
+   "fieldtype": "Link",
+   "label": "Last Activity By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "alphax_last_activity_type",
+   "fieldtype": "Data",
+   "label": "Last Activity Type",
+   "read_only": 1
+  },
+  {
+   "fieldname": "alphax_last_activity_summary",
+   "fieldtype": "Small Text",
+   "label": "Last Activity Summary",
+   "read_only": 1
+  },
+  {
+   "fieldname": "alphax_idle_days",
+   "fieldtype": "Int",
+   "label": "Idle Days",
+   "read_only": 1,
+   "in_standard_filter": 1
+  },
+  {
+   "fieldname": "conversion_section",
+   "fieldtype": "Section Break",
+   "label": "Conversion"
+  },
+  {
+   "fieldname": "lead",
+   "fieldtype": "Link",
+   "label": "Created Lead",
+   "options": "Lead",
+   "read_only": 1
+  },
+  {
+   "fieldname": "converted",
+   "fieldtype": "Check",
+   "label": "Converted to Lead",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "import_batch",
+   "fieldtype": "Data",
+   "label": "Import Batch",
+   "read_only": 1,
+   "hidden": 1,
+   "description": "Set automatically when this record was created via Smart Import; identifies the batch/run."
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Lead",
+   "link_fieldname": "alphax_prospect",
+   "group": "CRM"
+  }
+ ],
+ "modified": "2026-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AlphaX CRM",
+ "name": "AlphaX Prospect",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "allow_import": 1
+}

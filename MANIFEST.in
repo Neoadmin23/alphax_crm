@@ -1,0 +1,17 @@
+include MANIFEST.in
+include requirements.txt
+include *.json
+include *.md
+include *.txt
+recursive-include alphax_crm *.css
+recursive-include alphax_crm *.csv
+recursive-include alphax_crm *.html
+recursive-include alphax_crm *.ico
+recursive-include alphax_crm *.js
+recursive-include alphax_crm *.json
+recursive-include alphax_crm *.md
+recursive-include alphax_crm *.png
+recursive-include alphax_crm *.py
+recursive-include alphax_crm *.svg
+recursive-include alphax_crm *.txt
+recursive-exclude alphax_crm *.pyc

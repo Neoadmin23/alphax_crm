@@ -1,0 +1,11 @@
+alphax_crm.patches.v0_1.install_defaults
+alphax_crm.patches.v0_2.add_whatsapp
+
+[post_model_sync]
+alphax_crm.patches.v0_3.add_data_quality
+alphax_crm.patches.v0_4.add_prospect_review
+alphax_crm.patches.v0_5.add_activity_monitor
+alphax_crm.patches.v0_6.add_dimensions_and_backfill
+alphax_crm.patches.v0_7.add_report_fields
+alphax_crm.patches.v0_8.add_followup
+alphax_crm.patches.v0_9.add_smart_lead
