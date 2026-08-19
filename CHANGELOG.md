@@ -3,6 +3,62 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.12.2] — 2026-08-18
+### Fixed
+- Install failed on Frappe Cloud with "Module import failed for AlphaX
+  Business Unit ... No module named
+  'alphax_crm.alphax_crm.doctype.alphax_business_unit.alphax_business_unit'".
+  The 0.12.0 child doctype only shipped its `.json` — missing the
+  `alphax_business_unit.py` controller and `__init__.py` every doctype
+  folder needs, so Frappe's sync step (which imports the controller module
+  right after inserting the DocType) had nothing to import. Added both.
+  Audited every other doctype folder in the app for the same gap (missing
+  controller `.py` or `__init__.py`) — none found.
+
+## [0.12.1] — 2026-08-18
+### Fixed
+- Deploy failed on Frappe Cloud / bench with "Could not find a compatible
+  Frappe version in pyproject.toml" — `[tool.bench.frappe-dependencies]`
+  declared a version constraint for `erpnext` but not for `frappe` itself,
+  which Frappe Cloud requires. Added `frappe = ">=15.0.0,<16.0.0"`,
+  matching the existing `erpnext` constraint and the site's actual
+  versions (frappe 15.118.0 / erpnext 15.119.0).
+
+## [0.12.0] — 2026-08-17
+### Changed
+- **Smart Lead's "Business & Service Dimensions" reworked**: the flat
+  fields added in 0.11.0 (Business Division, Department, Employee Cost
+  Center, Sub Services, Quoted Value, Contract Duration, Expected Closing
+  Date) didn't match the real production data model and are **removed**.
+  Replaced with a new **Business Units** child table
+  (`AlphaX Business Unit`) mirroring production Lead's `Lead Business Unit`
+  table field-for-field (Business Unit, Lead Description, Business Contact
+  & Mobile, Business Contact Email, Expected Order Value, Payment Type,
+  Expected Close Date) — a Lead can have several business units, each with
+  its own contact and commercial terms, which the flat fields couldn't
+  represent at all.
+  `crm/smart_lead.py`'s default field map updated to match: rows copy
+  straight into Lead's `custom_business_lead_unit` table on sync (same
+  fieldnames on both sides, so Frappe's own table-field copy semantics
+  handle it with no per-row transform code needed). Not independently
+  re-verified against a live site since the maintainer doesn't have one
+  available here — worth a spot-check in staging.
+- **Approval workflow replaced**: "AlphaX Lead Review" (this app's own
+  provisioned workflow, `alphax_review_status`-driven) is now deactivated
+  in favor of **"Lead Approval -CRM"**, the customer's own process
+  (Draft → Pending Approval → Approved, with a Returned for Correction
+  loop; roles CRM Initiator / Sales Manager; field `workflow_state`).
+  Provisioned by a new `setup_lead_approval_workflow()` in
+  `setup/install.py`, following the exact same idempotent
+  create-if-missing / reactivate-if-inactive pattern already used for
+  "AlphaX Lead Review" — including the same supersession approach used
+  when "AlphaX Lead Review" itself replaced the earlier "AlphaX Lead
+  Workflow". Runs automatically via the existing `after_install` /
+  `after_migrate` hooks — no manual script needed, just `bench migrate`.
+  `setup_lead_workflow()` (the old provisioning function) is no longer
+  called from either hook, so it won't fight the deactivation by
+  re-enabling itself, but is left defined rather than deleted.
+
 ## [0.11.0] — 2026-08-12
 ### Added
 - **Business & Service Dimensions on AlphaX Smart Lead**, brought over from

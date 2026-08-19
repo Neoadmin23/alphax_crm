@@ -20,7 +20,7 @@ def after_install():
     seed_smart_lead_map()
     seed_prospect_statuses()
     setup_notifications()
-    setup_lead_workflow()
+    setup_lead_approval_workflow()
     frappe.db.commit()
 
 
@@ -36,7 +36,7 @@ def after_migrate():
     seed_smart_lead_map()
     seed_prospect_statuses()
     setup_notifications()
-    setup_lead_workflow()
+    setup_lead_approval_workflow()
     frappe.db.commit()
 
 
@@ -846,3 +846,93 @@ def _deactivate_legacy_workflow():
     legacy = "AlphaX Lead Workflow"
     if frappe.db.exists("Workflow", legacy) and frappe.db.get_value("Workflow", legacy, "is_active"):
         frappe.db.set_value("Workflow", legacy, "is_active", 0)
+
+
+# ---------------------------------------------------------------------------
+# Lead Approval -CRM  (supersedes "AlphaX Lead Review", per the customer's
+# own approval process: Draft -> Pending Approval -> Approved, with a
+# Returned for Correction loop). Same supersession pattern used above when
+# "AlphaX Lead Review" replaced "AlphaX Lead Workflow" — deactivate the old
+# one, provision the new one, idempotently.
+# ---------------------------------------------------------------------------
+CRM_INITIATOR_ROLE = "CRM Initiator"
+LEAD_APPROVAL_WORKFLOW = "Lead Approval -CRM"
+
+
+def setup_lead_approval_workflow():
+    _ensure_crm_initiator_role()
+    _deactivate_review_workflow()
+
+    name = LEAD_APPROVAL_WORKFLOW
+    if frappe.db.exists("Workflow", name):
+        # Keep it active; nothing else to do.
+        if not frappe.db.get_value("Workflow", name, "is_active"):
+            frappe.db.set_value("Workflow", name, "is_active", 1)
+        return
+
+    # (state, doc_status, allow_edit_role)
+    states = [
+        ("Draft", "0", CRM_INITIATOR_ROLE),
+        ("Pending Approval", "0", "Sales Manager"),
+        ("Returned for Correction", "0", CRM_INITIATOR_ROLE),
+        ("Approved", "0", CRM_INITIATOR_ROLE),
+    ]
+    # (from_state, action, to_state, allowed_role)
+    transitions = [
+        ("Draft", "Submit for Approval", "Pending Approval", CRM_INITIATOR_ROLE),
+        ("Pending Approval", "Approve", "Approved", "Sales Manager"),
+        ("Pending Approval", "Return for Correction", "Returned for Correction", "Sales Manager"),
+        ("Returned for Correction", "Resubmit for Approval", "Pending Approval", CRM_INITIATOR_ROLE),
+        ("Approved", "Reopen for Correction", "Returned for Correction", CRM_INITIATOR_ROLE),
+    ]
+
+    for state, _doc_status, _role in states:
+        if not frappe.db.exists("Workflow State", state):
+            frappe.get_doc({"doctype": "Workflow State", "workflow_state_name": state, "style": "Primary"}).insert(
+                ignore_permissions=True
+            )
+    for _from, action, _to, _role in transitions:
+        if not frappe.db.exists("Workflow Action Master", action):
+            frappe.get_doc(
+                {"doctype": "Workflow Action Master", "workflow_action_name": action}
+            ).insert(ignore_permissions=True)
+
+    wf = frappe.new_doc("Workflow")
+    wf.workflow_name = name
+    wf.document_type = "Lead"
+    wf.is_active = 1
+    # Deliberately Frappe's own default field name (not alphax_review_status,
+    # which belonged to the superseded "AlphaX Lead Review" workflow) — kept
+    # exactly as configured on the source site. Frappe creates this as a
+    # hidden custom Select field on Lead automatically if it doesn't exist.
+    wf.workflow_state_field = "workflow_state"
+    wf.override_status = 0
+    wf.send_email_alert = 0
+    for state, doc_status, role in states:
+        wf.append("states", {"state": state, "doc_status": doc_status, "allow_edit": role, "send_email": 1})
+    for frm, action, to, role in transitions:
+        wf.append(
+            "transitions",
+            {"state": frm, "action": action, "next_state": to, "allowed": role,
+             "allow_self_approval": 1, "send_email_to_creator": 0},
+        )
+    wf.flags.ignore_permissions = True
+    try:
+        wf.insert(ignore_permissions=True)
+    except Exception:
+        frappe.log_error(title="AlphaX CRM: lead approval workflow setup", message=frappe.get_traceback())
+
+
+def _ensure_crm_initiator_role():
+    if not frappe.db.exists("Role", CRM_INITIATOR_ROLE):
+        frappe.get_doc({"doctype": "Role", "role_name": CRM_INITIATOR_ROLE, "desk_access": 1}).insert(
+            ignore_permissions=True
+        )
+
+
+def _deactivate_review_workflow():
+    """"AlphaX Lead Review" is superseded by "Lead Approval -CRM". Deactivate
+    it if present — one active workflow per doctype."""
+    superseded = "AlphaX Lead Review"
+    if frappe.db.exists("Workflow", superseded) and frappe.db.get_value("Workflow", superseded, "is_active"):
+        frappe.db.set_value("Workflow", superseded, "is_active", 0)

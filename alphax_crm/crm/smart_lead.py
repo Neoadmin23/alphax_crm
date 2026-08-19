@@ -50,13 +50,7 @@ def _default_map():
         ("na_city", "city", "None"),
         ("status", "status", "None"),
         ("industry", "industry", "None"),
-        ("business_division", "business_division", "None"),
-        ("department", "department", "None"),
-        ("employee_cost_center", "employee_cost_center", "None"),
-        ("sub_services", "sub_services_", "None"),
-        ("quoted_value", "quoted_value", "None"),
-        ("contract_duration", "custom_contract_duration", "None"),
-        ("expected_closing_date", "expected_closing_date", "None"),
+        ("business_units", "custom_business_lead_unit", "None"),
     ]
 
 
