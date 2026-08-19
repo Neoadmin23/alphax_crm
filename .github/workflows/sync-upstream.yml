@@ -1,0 +1,84 @@
+name: Sync AlphaX CRM Upstream
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    - cron: "0 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: alphax-crm-upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout destination fork
+        uses: actions/checkout@v4
+        with:
+          repository: Neoadmin23/alphax_crm
+          ref: main
+          path: destination
+          fetch-depth: 0
+
+      - name: Checkout upstream source
+        uses: actions/checkout@v4
+        with:
+          repository: jamunachi08/alphax_crm
+          ref: main
+          path: source
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Preserve sync workflow
+        run: |
+          mkdir -p /tmp/alphax-sync
+          cp destination/.github/workflows/sync-upstream.yml \
+             /tmp/alphax-sync/sync-upstream.yml
+
+      - name: Sync upstream to fork
+        run: |
+          rsync -av --delete \
+            --exclude='.git/' \
+            source/ destination/
+
+      - name: Restore sync workflow
+        run: |
+          mkdir -p destination/.github/workflows
+          cp /tmp/alphax-sync/sync-upstream.yml \
+             destination/.github/workflows/sync-upstream.yml
+
+      - name: Read upstream version
+        id: version
+        run: |
+          if [ -f source/VERSION ]; then
+            VERSION=$(tr -d '\n\r ' < source/VERSION)
+          else
+            VERSION="unknown"
+          fi
+
+          SOURCE_SHA=$(git -C source rev-parse --short HEAD)
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "sha=$SOURCE_SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Commit synchronized changes
+        working-directory: destination
+        run: |
+          git config user.name "Neotec Sync Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Fork already matches upstream."
+            exit 0
+          fi
+
+          git commit -m "sync: AlphaX CRM v${{ steps.version.outputs.version }} | upstream ${{ steps.version.outputs.sha }}"
+          git push origin main
