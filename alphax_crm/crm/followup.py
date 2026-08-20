@@ -37,6 +37,8 @@ def process_followup(doc):
         from alphax_crm.crm.activity import record_activity
 
         atype = f"{doc.channel} ({doc.direction})" if doc.direction else doc.channel
+        if doc.meeting_type:
+            atype = f"{atype} · {doc.meeting_type}"
         if doc.outcome:
             atype = f"{atype} · {doc.outcome}"
         record_activity(ref_dt, ref_name, atype, doc.agent, (doc.summary or "")[:180])
@@ -57,7 +59,10 @@ def _log_communication(doc):
     if secs:
         m, s = divmod(secs, 60)
         dur = f" · {m}m {s}s" if m else f" · {s}s"
-    content = f"<b>{doc.channel} — {doc.outcome or 'logged'}</b>{dur}"
+    content = f"<b>{doc.channel}"
+    if doc.meeting_type:
+        content += f" — {doc.meeting_type}"
+    content += f" — {doc.outcome or 'logged'}</b>{dur}"
     if doc.summary:
         content += "<br>" + frappe.utils.escape_html(doc.summary)
     if doc.next_action:
@@ -105,12 +110,13 @@ def _create_reminder(doc):
 @frappe.whitelist()
 def log_followup(reference_doctype, reference_name, channel="Call", direction="Outgoing",
                  outcome="Connected", duration=0, summary=None, next_action=None,
-                 next_follow_up_date=None, follow_up_datetime=None):
+                 next_follow_up_date=None, follow_up_datetime=None, meeting_type=None):
     doc = frappe.get_doc({
         "doctype": "AlphaX Follow-up",
         "reference_doctype": reference_doctype,
         "reference_name": reference_name,
         "channel": channel,
+        "meeting_type": meeting_type if channel == "Meeting" else None,
         "direction": direction,
         "outcome": outcome,
         "duration": cint(duration),
@@ -131,7 +137,7 @@ def get_history(reference_doctype, reference_name):
     return frappe.get_all(
         "AlphaX Follow-up",
         filters={"reference_doctype": reference_doctype, "reference_name": reference_name},
-        fields=["name", "follow_up_datetime", "channel", "direction", "outcome",
+        fields=["name", "follow_up_datetime", "channel", "meeting_type", "direction", "outcome",
                 "agent", "summary", "next_action", "next_follow_up_date"],
         order_by="follow_up_datetime desc",
     )

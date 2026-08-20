@@ -57,6 +57,9 @@ window.alphax_log_followup = function (frm) {
         fields: [
             { fieldtype: "Select", fieldname: "channel", label: __("Channel"),
               options: "Call\nEmail\nWhatsApp\nMeeting\nVisit\nSMS\nOther", default: "Call", reqd: 1 },
+            { fieldtype: "Select", fieldname: "meeting_type", label: __("Meeting Type"),
+              options: "\nOnline Meeting\nOn-site Meeting",
+              depends_on: 'eval:doc.channel=="Meeting"', mandatory_depends_on: 'eval:doc.channel=="Meeting"' },
             { fieldtype: "Select", fieldname: "direction", label: __("Direction"),
               options: "Outgoing\nIncoming", default: "Outgoing" },
             { fieldtype: "Column Break" },
@@ -76,7 +79,7 @@ window.alphax_log_followup = function (frm) {
                 method: "alphax_crm.crm.followup.log_followup",
                 args: {
                     reference_doctype: frm.doctype, reference_name: frm.docname,
-                    channel: v.channel, direction: v.direction, outcome: v.outcome,
+                    channel: v.channel, meeting_type: v.meeting_type || "", direction: v.direction, outcome: v.outcome,
                     duration: v.duration || 0, summary: v.summary || "",
                     next_action: v.next_action || "", next_follow_up_date: v.next_follow_up_date || null,
                 },
@@ -106,7 +109,7 @@ window.alphax_followup_history = function (frm) {
             const when = frappe.datetime.str_to_user(f.follow_up_datetime);
             const nxt = f.next_follow_up_date ? ` · <b>next</b> ${frappe.datetime.str_to_user(f.next_follow_up_date)}` : "";
             return `<div style="padding:8px 0;border-bottom:1px solid #eee">
-                <div><b>${f.channel}</b> (${f.direction || ""}) — ${f.outcome || ""} · <span style="color:#888">${when}</span></div>
+                <div><b>${f.channel}${f.meeting_type ? " · " + f.meeting_type : ""}</b> (${f.direction || ""}) — ${f.outcome || ""} · <span style="color:#888">${when}</span></div>
                 <div>${frappe.utils.escape_html(f.summary || "")}</div>
                 <div style="color:#5b21b6">${f.next_action ? "→ " + frappe.utils.escape_html(f.next_action) : ""}${nxt}</div>
                 <div style="color:#999;font-size:11px">${f.agent || ""} · ${f.name}</div></div>`;

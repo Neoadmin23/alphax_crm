@@ -3,6 +3,111 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.13.4] — 2026-08-20
+### Fixed
+- Frappe Cloud rejected the previous release with "Invalid release" /
+  `SyntaxError: invalid decimal literal` pointing at lines like
+  `>>>>>>> 7b84d8994af65258f09478dcce5943e2659c1538` in `__init__.py`,
+  `crm/followup.py`, `crm/prospect.py`, `hooks.py`, `setup/install.py`,
+  and `setup.py`. Those are literal unresolved git merge-conflict markers,
+  not something introduced by this app's own source — these release zips
+  are full snapshots written directly, not incremental patches, and
+  contain no conflict markers anywhere (checked). This most likely
+  happened applying a prior zip via `git merge`/`git apply` against
+  diverging history and committing before resolving the conflict.
+  This release is a clean re-verified snapshot of the current app state
+  (identical content to 0.13.3) with no merge markers of any kind —
+  confirmed via `py_compile` across every `.py` file and a repo-wide grep
+  for `<<<<<<<` / `=======` / `>>>>>>>`. Recommend replacing the app
+  directory wholesale from this zip (or re-cloning) rather than merging
+  it on top of the corrupted commit, to avoid re-introducing the same
+  conflict.
+
+## [0.13.3] — 2026-08-20
+### Fixed
+- Prospect → Lead auto-conversion failed with "Workflow State transition
+  not allowed from Draft to Pending Review". Root cause: `_convert_to_lead`
+  still force-set `lead.alphax_review_status = "Pending Review"` — the
+  field governed by the now-superseded "AlphaX Lead Review" workflow
+  (deactivated in 0.12.0). With "Lead Approval -CRM" active instead (field
+  `workflow_state`, entry state "Draft", and no "Pending Review" state at
+  all), that stale assignment tripped the new workflow's own transition
+  validation. Both conversion paths (direct, and via Smart Lead) now check
+  which workflow is actually active on Lead via a new
+  `_active_lead_workflow_field()` helper, and only set
+  `alphax_review_status` when that's genuinely the field the active
+  workflow governs. Otherwise it's left untouched, so the Lead lands in
+  its real entry state — currently "Draft" — the way it should. Verified
+  against all three cases (new workflow active, old workflow active, no
+  workflow active) via a stubbed run of the guard logic.
+
+## [0.13.2] — 2026-08-20
+### Changed
+- The conversion-failure message from 0.13.1 was a one-time toast that
+  vanished once dismissed. It's now **persistent**: two new fields on
+  AlphaX Prospect, `Conversion Failed` (Check, shown in the list view and
+  filterable) and `Conversion Error` (the actual message, shown on the
+  form only while the flag is set). Both stay set — and a red banner stays
+  on the form — until conversion actually succeeds, at which point they're
+  cleared automatically. Covers both conversion paths, same as 0.13.1.
+  Verified with an end-to-end simulation: a forced failure sets the flag
+  and message and reverts the status; a subsequent successful retry
+  clears both while leaving the (now-valid) status alone.
+
+## [0.13.1] — 2026-08-20
+### Fixed
+- Setting a Prospect to a status configured to auto-convert (e.g.
+  "Interested") would leave the status changed even when conversion
+  failed (e.g. a required Lead field like Job Title was missing) —
+  `on_update` runs after the Prospect's own status change is already
+  committed, and the conversion attempt was wrapped in a try/except that
+  only logged the error, silently. The Prospect was left showing
+  "Interested" with no Lead behind it and no visible reason why.
+  `on_update` now reverts the status back to what it was before the save
+  (or the default status, if there was no "before" state) when conversion
+  fails, and shows a clear red message explaining both that it reverted
+  and the actual underlying error, instead of the failure only being
+  visible in the Error Log. Covers both conversion paths (direct to Lead,
+  and Prospect → Smart Lead → Lead), since the Smart Lead path is called
+  from inside the same function and any failure there propagates through
+  the same try/except. Verified end-to-end with a stubbed `on_update` run:
+  a forced conversion failure correctly reverts the status and produces
+  the expected message.
+
+## [0.13.0] — 2026-08-19
+### Changed
+- **AlphaX Prospect "City"** changed from free-text Data to a Link against
+  the **City** doctype (the same tree-structured master already used
+  elsewhere on the site).
+- **AlphaX Prospect "Job Title"** changed from free-text Data to a Link
+  against the standard **Designation** master (reused rather than creating
+  a new AlphaX-specific list, matching the "Business Domain" precedent set
+  in 0.11.0). Seeded via a new idempotent `seed_job_titles()` (runs on
+  install/migrate) with the 45 job titles supplied — kept verbatim,
+  including a couple of likely typos ("Sales manger", "partener") and a
+  literal "unknown" entry, since they may already be in use on existing
+  records. Say the word and I'll clean those up.
+
+### Added
+- **Accounting Dimensions on Prospect are now opt-in and independently
+  restricted**, via two new `AlphaX CRM Settings` fields:
+  `Enable Accounting Dimensions on Prospect` (off by default) and
+  `Prospect Dimension Fields` (comma list, default `cost_center` only).
+  Lead and Opportunity are untouched — they keep getting every active
+  Accounting Dimension unconditionally, exactly as before. Previously
+  Prospect was already technically in the list of doctypes this
+  mechanism could target, gated only by one global on/off switch shared
+  with Lead/Opportunity — so turning it on for Prospect would have dumped
+  all 4 active dimensions (Business Division, Employee Cost Center, Cost
+  Center, Department) onto the calling-list form at once. Verified the
+  filtering logic in isolation: enabling with the default setting yields
+  Cost Center only; Lead/Opportunity are unaffected either way.
+- **Meeting Type** (Online Meeting / On-site Meeting) on the Log Follow-up
+  flow — new field on `AlphaX Follow-up`, shown (and required) only when
+  Channel = "Meeting", threaded through `log_followup()`, the logged
+  Communication's content, the activity-timeline summary, and the
+  Follow-up History view.
+
 ## [0.12.2] — 2026-08-18
 ### Fixed
 - Install failed on Frappe Cloud with "Module import failed for AlphaX

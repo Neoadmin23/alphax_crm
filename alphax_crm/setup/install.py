@@ -19,6 +19,7 @@ def after_install():
     _seed_monitor_fields()
     seed_smart_lead_map()
     seed_prospect_statuses()
+    seed_job_titles()
     setup_notifications()
     setup_lead_approval_workflow()
     frappe.db.commit()
@@ -35,6 +36,7 @@ def after_migrate():
     _seed_monitor_fields()
     seed_smart_lead_map()
     seed_prospect_statuses()
+    seed_job_titles()
     setup_notifications()
     setup_lead_approval_workflow()
     frappe.db.commit()
@@ -393,6 +395,22 @@ def setup_accounting_dimensions():
     for target in DIM_TARGETS:
         if not frappe.db.exists("DocType", target):
             continue
+        if target == "AlphaX Prospect":
+            # Opt-in and restricted (default: Cost Center only) — see
+            # prospect_dimensions_enabled / prospect_dimension_fields.
+            # Lead and Opportunity are unaffected and keep the prior
+            # all-active-dimensions behavior.
+            if not settings.get("prospect_dimensions_enabled"):
+                continue
+            allowed = {
+                f.strip() for f in (settings.get("prospect_dimension_fields") or "cost_center").split(",")
+                if f.strip()
+            }
+            target_dims = [d for d in dims if d[0] in allowed]
+        else:
+            target_dims = dims
+        if not target_dims:
+            continue
         meta = frappe.get_meta(target)
         rows = []
         anchor = DIM_ANCHOR.get(target)
@@ -404,7 +422,7 @@ def setup_accounting_dimensions():
                 "label": "Accounting Dimensions", "collapsible": 1, "insert_after": anchor,
             })
         prev = "alphax_dimensions_section"
-        for fn, label, doctype in dims:
+        for fn, label, doctype in target_dims:
             if meta.has_field(fn):        # already on the doctype (native or created)
                 prev = fn
                 continue
@@ -567,6 +585,48 @@ def seed_prospect_statuses():
                 "color": color,
             }
         ).insert(ignore_permissions=True)
+
+
+def seed_job_titles():
+    """Seed the standard Designation master with AlphaX's known job titles
+    (from the customer's own job-title drop-list), so AlphaX Prospect's
+    "Job Title" field — now a Link to Designation instead of free text —
+    has a usable list from day one. Reuses Designation (already used
+    site-wide for Employees) rather than a new AlphaX-specific master.
+    Idempotent: only inserts titles that don't already exist.
+    """
+    if not frappe.db.exists("DocType", "Designation"):
+        return
+    for title in _default_job_titles():
+        if frappe.db.exists("Designation", title):
+            continue
+        try:
+            frappe.get_doc({"doctype": "Designation", "designation_name": title}).insert(
+                ignore_permissions=True
+            )
+        except Exception:
+            frappe.log_error(title="AlphaX CRM: job title seed", message=frappe.get_traceback())
+
+
+def _default_job_titles():
+    # As supplied by the customer. A few likely typos are kept verbatim
+    # ("Sales manger", "partener") rather than silently corrected, since
+    # they may already be in use on existing records — happy to clean these
+    # up (and merge "unknown" into a blank/Other) on request.
+    return [
+        "Owner", "Manager", "Purchase specialist", "Customer service", "Employee",
+        "Call center", "Engineering", "unknown", "Sales manger", "Co-Founder",
+        "Accountant", "CEO", "Owner's assistant", "HR employee", "Strategic Consultant",
+        "Chairman", "Marketer", "Account Manager", "partener", "GM assistant",
+        "Administrative Officer", "CFO", "Accounting manager", "specialist",
+        "Founder - CEO", "Business Consulting Specialist", "Founder - Sales Director",
+        "Founder - COO", "CEO - Medical Director", "Deputy CEO", "Investor",
+        "Co-Founder - Creative Director", "HR Manager", "Regional Manager",
+        "Co-Founder - interior designer", "Deputy Manager", "GM",
+        "CEO - Creative Director", "partener - Creative Director", "Founder - CCO",
+        "Board Member", "Co-Founder - Managing Director", "Co-Founder - Chief Instructor",
+        "Co-Founder - GM", "Founder - CTO",
+    ]
 
 
 def ensure_prospect_defaults():

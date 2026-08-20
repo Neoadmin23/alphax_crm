@@ -43,11 +43,12 @@ def validate(doc, method=None):
 # ---------------------------------------------------------------------------
 def on_update(doc, method=None):
     settings = get_settings()
+    before = doc.get_doc_before_save()
+    previous_status = before.get("status") if before else None
 
     # Record status change as activity.
     if settings.get("activity_monitor_enabled", 1) and settings.get("capture_status_change", 1):
-        before = doc.get_doc_before_save()
-        if before and before.get("status") != doc.get("status") and doc.get("status"):
+        if before and previous_status != doc.get("status") and doc.get("status"):
             try:
                 from alphax_crm.crm.activity import record_activity
 
@@ -62,13 +63,73 @@ def on_update(doc, method=None):
         if settings.get("prospect_autoconvert", 1) and not doc.get("lead"):
             try:
                 _convert_to_lead(doc, settings)
-            except Exception:
+                _clear_conversion_failure(doc)
+            except Exception as e:
                 log_error("prospect convert")
+                _revert_status(doc, previous_status, e)
     elif behavior == BEHAVIOR_FOLLOWUP:
         try:
             _ensure_followup(doc)
         except Exception:
             log_error("prospect followup")
+
+
+def _revert_status(doc, previous_status, error):
+    """Conversion failed after the status change was already committed
+    (on_update runs post-save). Left as-is, the Prospect would show a
+    status like "Interested" with no Lead behind it and no visible reason
+    why — confusing, and easy to miss since the failure was only logged.
+    Revert the status itself and record the failure as a persistent flag +
+    message on the record (not just a one-time toast) so it stays visible
+    on the form, and filterable in the list, until the underlying issue is
+    fixed and conversion actually succeeds.
+    """
+    fallback = (
+        previous_status
+        or frappe.db.get_value("AlphaX Prospect Status", {"is_default": 1}, "name")
+        or "New"
+    )
+    message = str(error)
+    updates = {"conversion_failed": 1, "conversion_error": message}
+    if fallback != doc.get("status"):
+        updates["status"] = fallback
+        doc.status = fallback
+    frappe.db.set_value("AlphaX Prospect", doc.name, updates, update_modified=False)
+    doc.conversion_failed = 1
+    doc.conversion_error = message
+    doc.notify_update()
+    frappe.msgprint(
+        _("Could not convert to Lead, so the status was reverted to {0}.<br>Reason: {1}<br>"
+          "This will stay flagged on the record until it converts successfully.").format(
+            frappe.bold(fallback), frappe.utils.escape_html(message)
+        ),
+        title=_("Conversion Failed"),
+        indicator="red",
+    )
+
+
+def _clear_conversion_failure(doc):
+    if doc.get("conversion_failed"):
+        frappe.db.set_value(
+            "AlphaX Prospect", doc.name,
+            {"conversion_failed": 0, "conversion_error": ""},
+            update_modified=False,
+        )
+        doc.conversion_failed = 0
+        doc.conversion_error = ""
+
+
+def _active_lead_workflow_field():
+    """The workflow_state_field of whichever Workflow is currently active
+    for Lead, or None if there isn't one. Cached per-request via
+    frappe.local since this is a database-only fact that can't change
+    mid-request, and both conversion paths call it.
+    """
+    if not hasattr(frappe.local, "_alphax_active_lead_wf_field"):
+        frappe.local._alphax_active_lead_wf_field = frappe.db.get_value(
+            "Workflow", {"document_type": "Lead", "is_active": 1}, "workflow_state_field"
+        )
+    return frappe.local._alphax_active_lead_wf_field
 
 
 def _convert_to_lead(doc, settings):
@@ -111,9 +172,17 @@ def _convert_to_lead(doc, settings):
     if doc.get("prospect_owner"):
         lead.lead_owner = doc.prospect_owner
 
-    # Enter the review workflow.
+    # Enter the review workflow — but only touch alphax_review_status if
+    # that's actually the field the *currently active* Lead workflow
+    # governs. It belonged to the now-superseded "AlphaX Lead Review"
+    # workflow; force-setting it while a different workflow (e.g. "Lead
+    # Approval -CRM", field workflow_state, entry state "Draft") is active
+    # trips that workflow's own transition validation ("not allowed from
+    # Draft to Pending Review") since "Pending Review" isn't even one of
+    # its states. If no active workflow uses this field, leave it alone
+    # and let Frappe's own engine put the Lead in the real entry state.
     review_required = settings.get("prospect_review_required", 1)
-    if meta.has_field("alphax_review_status"):
+    if meta.has_field("alphax_review_status") and _active_lead_workflow_field() == "alphax_review_status":
         lead.alphax_review_status = "Pending Review" if review_required else "Approved"
     if meta.has_field("alphax_prospect"):
         lead.alphax_prospect = doc.name
@@ -189,7 +258,7 @@ def _convert_via_smart_lead(doc, settings):
         updates = {}
         if meta.has_field("alphax_prospect"):
             updates["alphax_prospect"] = doc.name
-        if meta.has_field("alphax_review_status"):
+        if meta.has_field("alphax_review_status") and _active_lead_workflow_field() == "alphax_review_status":
             updates["alphax_review_status"] = "Pending Review" if settings.get("prospect_review_required", 1) else "Approved"
         if updates:
             frappe.db.set_value("Lead", lead_name, updates, update_modified=False)

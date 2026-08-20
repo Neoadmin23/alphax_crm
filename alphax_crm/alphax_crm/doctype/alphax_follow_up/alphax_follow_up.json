@@ -16,6 +16,7 @@
   "agent",
   "detail_section",
   "channel",
+  "meeting_type",
   "direction",
   "outcome",
   "duration",
@@ -87,6 +88,15 @@
    "options": "Call\nEmail\nWhatsApp\nMeeting\nVisit\nSMS\nOther",
    "default": "Call",
    "reqd": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "meeting_type",
+   "fieldtype": "Select",
+   "label": "Meeting Type",
+   "options": "\nOnline Meeting\nOn-site Meeting",
+   "depends_on": "eval:doc.channel==\"Meeting\"",
+   "mandatory_depends_on": "eval:doc.channel==\"Meeting\"",
    "in_list_view": 1
   },
   {
