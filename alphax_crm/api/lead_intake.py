@@ -97,7 +97,7 @@ def _log_intake(channel, status, payload, identifier, lead=None, error=None):
     """
     try:
         doc = frappe.get_doc({
-            "doctype": "AlphaX Lead Intake",
+            "doctype": "AlphaX Lead Initiation",
             "channel": channel,
             "status": status,
             "lead": lead,

@@ -3,6 +3,99 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.15.0] — 2026-08-24
+### Changed — BREAKING: doctype rename, requires a manual site-side step
+- **Renamed `AlphaX Prospect` \u2192 `AlphaX Lead Entry Point`**, and
+  **`AlphaX Prospect Status` \u2192 `AlphaX Lead Entry Point Status`**,
+  to resolve a real naming collision: ERPNext ships its own native
+  `Prospect` doctype (aggregates Leads/Opportunities under a company
+  account, via a `Prospect Lead` child table) which is a *different*
+  concept sitting *after* Lead in ERPNext's real funnel \u2014 while ours
+  sits *before* Lead as the pre-qualification calling list. Confirmed via
+  ERPNext's own source before renaming. The funnel is now:
+  **Lead Entry Point \u2192 Lead \u2192 (ERPNext's native) Prospect \u2192
+  Opportunity**, which rides on ERPNext's real pipeline instead of
+  shadowing it with a lookalike name.
+- Scope of the rename: doctype folders, JSON `name`, controller classes
+  (`AlphaXLeadEntryPoint`, `AlphaXLeadEntryPointStatus`), the business-logic
+  module (`crm/prospect.py` \u2192 `crm/lead_entry_point.py`), the form
+  script (`public/js/prospect.js` \u2192 `public/js/lead_entry_point.js`),
+  the list-view script and its filename, every `hooks.py` registration
+  (`doctype_js`, `doc_events`), `DIM_TARGETS`/`DIM_ANCHOR`, the Lead-side
+  Link field's target doctype and label, all workspace/report/settings
+  labels and descriptions, and the naming series (`PROS-.YYYY.-` \u2192
+  `LEP-.YYYY.-`, new records only).
+- Deliberately **not** renamed: internal fieldnames (`prospect_name`,
+  `prospect_owner`, the Settings fields `prospect_autoconvert` etc.,
+  Lead's `alphax_prospect` link fieldname) and historical `patches/*`
+  files. Fieldnames are live database columns with real data in them on
+  every existing record \u2014 renaming those needs `frappe.rename_field`
+  data migration, which is a separate, bigger decision than a display-name
+  rename and wasn't part of what was asked. Old patch files are a record
+  of what actually ran historically and rewriting them after the fact
+  would misrepresent that history.
+- **Found and fixed, opportunistically, a genuinely pre-existing bug**
+  encountered while working in the list-view file: the "Convert to Lead"
+  bulk action called `alphax_crm.api.prospect.convert_to_lead`, a method
+  that has never existed in this app (no `api/prospect.py` ever existed;
+  the real logic was always a private, unexposed `_convert_to_lead`). That
+  button has silently done nothing since before this session started. Added
+  a proper whitelisted `bulk_convert_to_lead()` wrapping the same
+  conversion logic the automatic status-driven path uses, and pointed the
+  list view at it.
+- Full-tree verification: `py_compile` across every `.py` file, JSON/JS
+  syntax checks, a repo-wide grep confirming zero remaining references to
+  the old doctype names anywhere, and an explicit check that folder name /
+  JSON `name` / controller class agree for both renamed doctypes (the
+  exact mismatch class that caused the AlphaX Business Unit install
+  failure earlier in this app's history).
+
+### Deployment note
+Existing `AlphaX Prospect` / `AlphaX Prospect Status` records are **not**
+touched by installing this app version \u2014 an app update alone only
+changes code, not existing document names or the underlying database
+table. To actually rename the live doctype (its table, and every Link
+field pointing at it) on a site that already has data, run this **after**
+deploying this app version, not before (the renamed controller files need
+to already be in place):
+
+**Easiest \u2014 via Desk UI** (recommended if you're not comfortable with
+bench console): go to the DocType list, open **AlphaX Prospect**, use the
+**\u22ef menu \u2192 Rename**, and rename it to `AlphaX Lead Entry Point`.
+Repeat for **AlphaX Prospect Status** \u2192 `AlphaX Lead Entry Point Status`.
+
+**Or via bench**, if you prefer the command line:
+```
+bench --site <site> execute frappe.rename_doc --args "['DocType','AlphaX Prospect','AlphaX Lead Entry Point']"
+bench --site <site> execute frappe.rename_doc --args "['DocType','AlphaX Prospect Status','AlphaX Lead Entry Point Status']"
+```
+(There's no `bench rename-doctype` command \u2014 `frappe.rename_doc` is
+the actual mechanism; both paths call the same thing under the hood.)
+
+Either way: **take a site backup first**, and ideally rehearse this on a
+staging copy before touching production \u2014 renaming a DocType with
+existing data is a well-known rough edge in Frappe (it also tries to
+rename controller files on disk, which is exactly why deploying this
+app version *first* matters, so it finds the renamed files already
+correct rather than clashing with them). Existing records keep their old
+`PROS-...` names regardless \u2014 the naming series change only affects
+newly created records going forward.
+
+## [0.14.1] — 2026-08-24
+### Changed
+- Renamed the doctype introduced in 0.14.0 from **AlphaX Lead Intake** to
+  **AlphaX Lead Initiation** (folder, JSON `name`, controller class
+  `AlphaXLeadInitiation`, naming series `INIT-.YYYY.-`, both `_log_intake`
+  call sites in `api/lead_intake.py` / `api/whatsapp.py`, and the workspace
+  shortcut label). Safe as a clean rename rather than a live migration,
+  since this doctype was never deployed. Verified no stray references to
+  the old name remain anywhere in the app, and that folder name / JSON
+  `name` / controller class all agree — a mismatch there is exactly the
+  kind of thing that fails silently until Frappe tries to load the module.
+- Removed the descriptive help text from AlphaX Prospect's `Job Title`
+  field (the "Reuses the standard Designation master..." note added in
+  0.13.0) — the field itself is unchanged, just the on-form description.
+
 ## [0.14.0] — 2026-08-20
 ### Added
 - **AlphaX Lead Intake**, a new doctype logging every inbound Lead-capture

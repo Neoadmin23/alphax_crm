@@ -225,9 +225,9 @@ def setup_custom_fields():
             },
             {
                 "fieldname": "alphax_prospect",
-                "label": "Source Prospect",
+                "label": "Source Lead Entry Point",
                 "fieldtype": "Link",
-                "options": "AlphaX Prospect",
+                "options": "AlphaX Lead Entry Point",
                 "read_only": 1,
                 "insert_after": "alphax_review_status",
             },
@@ -352,10 +352,10 @@ def setup_custom_fields():
 
 
 # ---------------------------------------------------------------------------
-# Accounting dimensions -> Link fields on Lead / Prospect / Opportunity
+# Accounting dimensions -> Link fields on Lead / Lead Entry Point / Opportunity
 # ---------------------------------------------------------------------------
-DIM_TARGETS = ["Lead", "AlphaX Prospect", "Opportunity"]
-DIM_ANCHOR = {"Lead": "alphax_reviewed_by", "AlphaX Prospect": "job_title", "Opportunity": "alphax_risk_signal"}
+DIM_TARGETS = ["Lead", "AlphaX Lead Entry Point", "Opportunity"]
+DIM_ANCHOR = {"Lead": "alphax_reviewed_by", "AlphaX Lead Entry Point": "job_title", "Opportunity": "alphax_risk_signal"}
 
 
 def active_accounting_dimensions():
@@ -395,7 +395,7 @@ def setup_accounting_dimensions():
     for target in DIM_TARGETS:
         if not frappe.db.exists("DocType", target):
             continue
-        if target == "AlphaX Prospect":
+        if target == "AlphaX Lead Entry Point":
             # Opt-in and restricted (default: Cost Center only) — see
             # prospect_dimensions_enabled / prospect_dimension_fields.
             # Lead and Opportunity are unaffected and keep the prior
@@ -555,7 +555,7 @@ def ensure_dq_rules():
 
 
 # ---------------------------------------------------------------------------
-# Prospect statuses (configurable labels) + prospect defaults
+# Lead Entry Point statuses (configurable labels) + prospect defaults
 # ---------------------------------------------------------------------------
 def _default_prospect_statuses():
     # (label, behavior, is_active, is_default, color)
@@ -570,14 +570,14 @@ def _default_prospect_statuses():
 
 
 def seed_prospect_statuses():
-    if not frappe.db.exists("DocType", "AlphaX Prospect Status"):
+    if not frappe.db.exists("DocType", "AlphaX Lead Entry Point Status"):
         return
     for label, behavior, active, default, color in _default_prospect_statuses():
-        if frappe.db.exists("AlphaX Prospect Status", label):
+        if frappe.db.exists("AlphaX Lead Entry Point Status", label):
             continue
         frappe.get_doc(
             {
-                "doctype": "AlphaX Prospect Status",
+                "doctype": "AlphaX Lead Entry Point Status",
                 "status_name": label,
                 "behavior": behavior,
                 "is_active": active,
@@ -589,7 +589,7 @@ def seed_prospect_statuses():
 
 def seed_job_titles():
     """Seed the standard Designation master with AlphaX's known job titles
-    (from the customer's own job-title drop-list), so AlphaX Prospect's
+    (from the customer's own job-title drop-list), so AlphaX Lead Entry Point's
     "Job Title" field — now a Link to Designation instead of free text —
     has a usable list from day one. Reuses Designation (already used
     site-wide for Employees) rather than a new AlphaX-specific master.

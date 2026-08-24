@@ -199,7 +199,7 @@ def refresh_activity_monitor():
     if not settings.get("activity_monitor_enabled", 1):
         return
     today = getdate(nowdate())
-    for target in ("Lead", "Opportunity", "AlphaX Prospect"):
+    for target in ("Lead", "Opportunity", "AlphaX Lead Entry Point"):
         try:
             records = get_open_records(target, settings, fields=["name", "creation", "alphax_last_activity"])
         except Exception:
@@ -236,7 +236,7 @@ def get_open_filters(target, settings):
         return {"status": ["in", statuses]} if statuses else {}
     if target == "Opportunity":
         return {"status": ["in", ["Open", "Replied", "Quotation"]]}
-    if target == "AlphaX Prospect":
+    if target == "AlphaX Lead Entry Point":
         return {"converted": 0}
     return {}
 
@@ -277,7 +277,7 @@ def backfill_activity_monitor(doctypes=None, limit=0):
             doctypes = json.loads(doctypes)
         except Exception:
             doctypes = [doctypes]
-    targets = doctypes or ["Lead", "Opportunity", "AlphaX Prospect"]
+    targets = doctypes or ["Lead", "Opportunity", "AlphaX Lead Entry Point"]
     today = getdate(nowdate())
     total = 0
     for target in targets:

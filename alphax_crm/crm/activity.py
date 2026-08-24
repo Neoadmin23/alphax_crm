@@ -65,7 +65,7 @@ def log_call(reference_doctype, reference_name, call_type="Outgoing", status="Co
 def on_communication(doc, method=None):
     ref_dt = doc.get("reference_doctype")
     ref_name = doc.get("reference_name")
-    if ref_dt not in ("Lead", "Opportunity", "AlphaX Prospect") or not ref_name:
+    if ref_dt not in ("Lead", "Opportunity", "AlphaX Lead Entry Point") or not ref_name:
         return
     if not frappe.db.exists(ref_dt, ref_name):
         return
@@ -103,10 +103,10 @@ def on_communication(doc, method=None):
 
 
 def on_comment(doc, method=None):
-    """A user comment on a Lead/Prospect counts as activity."""
+    """A user comment on a Lead/Lead Entry Point counts as activity."""
     ref_dt = doc.get("reference_doctype")
     ref_name = doc.get("reference_name")
-    if ref_dt not in ("Lead", "Opportunity", "AlphaX Prospect") or not ref_name:
+    if ref_dt not in ("Lead", "Opportunity", "AlphaX Lead Entry Point") or not ref_name:
         return
     if doc.get("comment_type") not in (None, "Comment"):
         return
@@ -131,7 +131,7 @@ def record_activity(ref_dt, ref_name, activity_type, by_user, summary):
             payload["alphax_last_activity_summary"] = summary
         if meta.has_field("alphax_idle_days"):
             payload["alphax_idle_days"] = 0
-        if meta.has_field("last_contacted_on") and ref_dt == "AlphaX Prospect":
+        if meta.has_field("last_contacted_on") and ref_dt == "AlphaX Lead Entry Point":
             payload["last_contacted_on"] = now_datetime()
         if payload:
             frappe.db.set_value(ref_dt, ref_name, payload, update_modified=False)

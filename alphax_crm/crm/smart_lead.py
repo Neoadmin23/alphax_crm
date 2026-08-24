@@ -165,7 +165,7 @@ def _primary_cost_center(doc):
 # Each target doctype in the CRM spells "email" differently — same lesson
 # learned (the hard way) from Smart Import's duplicate check: build filters
 # per doctype, never assume one fieldname works everywhere.
-_DEDUP_EMAIL_FIELD = {"Lead": "email_id", "AlphaX Prospect": "email_id", "AlphaX Smart Lead": "email"}
+_DEDUP_EMAIL_FIELD = {"Lead": "email_id", "AlphaX Lead Entry Point": "email_id", "AlphaX Smart Lead": "email"}
 
 
 @frappe.whitelist()
@@ -173,7 +173,7 @@ def check_duplicate(email=None, mobile_no=None, exclude=None):
     """Live duplicate check for the Smart Lead form (email/mobile, on blur).
 
     Returns a list of {doctype, name, title} for existing Lead / AlphaX
-    Prospect / AlphaX Smart Lead records matching either value, excluding
+    Lead Entry Point / AlphaX Smart Lead records matching either value, excluding
     `exclude` (the current, possibly-unsaved record's own name) so an
     existing record doesn't flag itself while being edited.
     """
@@ -188,7 +188,7 @@ def check_duplicate(email=None, mobile_no=None, exclude=None):
             or_filters.append(["mobile_no", "=", mobile_no])
         if not or_filters:
             continue
-        title_field = "lead_name" if dt == "Lead" else ("prospect_name" if dt == "AlphaX Prospect" else "organization")
+        title_field = "lead_name" if dt == "Lead" else ("prospect_name" if dt == "AlphaX Lead Entry Point" else "organization")
         for row in frappe.get_all(dt, or_filters=or_filters, fields=["name", title_field], limit=5):
             name = row.get("name")
             if dt == "AlphaX Smart Lead" and exclude and name == exclude:

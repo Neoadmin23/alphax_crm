@@ -40,7 +40,7 @@
    "fieldname": "reference_doctype",
    "fieldtype": "Select",
    "label": "Regarding",
-   "options": "Lead\nAlphaX Prospect\nOpportunity",
+   "options": "Lead\nAlphaX Lead Entry Point\nOpportunity",
    "default": "Lead",
    "reqd": 1,
    "in_standard_filter": 1

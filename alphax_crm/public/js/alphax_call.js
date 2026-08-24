@@ -1,4 +1,4 @@
-// Shared "Log a Call" dialog for AlphaX CRM (Prospect + Lead).
+// Shared "Log a Call" dialog for AlphaX CRM (Lead Entry Point + Lead).
 window.alphax_log_call = function (frm) {
     const d = new frappe.ui.Dialog({
         title: __("Log a Call"),
@@ -50,7 +50,7 @@ window.alphax_call_history = function (frm) {
     frappe.set_route("List", "Communication");
 };
 
-// ---- Complete follow-up mechanism (Lead / Prospect / Opportunity) ----
+// ---- Complete follow-up mechanism (Lead / Lead Entry Point / Opportunity) ----
 window.alphax_log_followup = function (frm) {
     const d = new frappe.ui.Dialog({
         title: __("Log Follow-up"),
