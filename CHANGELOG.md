@@ -3,6 +3,23 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.14.0] — 2026-08-20
+### Added
+- **AlphaX Lead Intake**, a new doctype logging every inbound Lead-capture
+  attempt through the two webhook-driven channels that previously left no
+  visible record at all: `alphax_crm.api.lead_intake.capture()` (website
+  forms, Meta/Google lead ads, generic API) and the WhatsApp handler's own
+  Lead resolution. Each record captures channel, outcome (Success /
+  Duplicate / Failed), the resulting Lead if one was created, a contact
+  identifier, consent flag, error detail on failure, and the raw payload
+  for audit. Deliberately scoped to just these two paths — Smart Import
+  and manual entry already have their own visibility (import summaries,
+  standard doc metadata), so aren't duplicated here.
+  Added as a workspace shortcut ("Lead Intake", ahead of Prospect) for
+  discoverability. Verified end-to-end with a stubbed run of `capture()`
+  covering all three outcomes plus WhatsApp's separate logging call, and
+  the channel-detection heuristic (meta/google/whatsapp/website/other).
+
 ## [0.13.4] — 2026-08-20
 ### Fixed
 - Frappe Cloud rejected the previous release with "Invalid release" /

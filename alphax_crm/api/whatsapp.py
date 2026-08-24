@@ -209,8 +209,36 @@ def _resolve_lead(wa_id, contact_name, text, settings):
         lead.alphax_inbound_message = text
     lead.flags.ignore_permissions = True
     lead.flags.alphax_skip_dq = True
-    lead.insert(ignore_permissions=True)
+    try:
+        lead.insert(ignore_permissions=True)
+    except Exception:
+        _log_intake("WhatsApp", "Failed", lead.mobile_no, error=frappe.get_traceback())
+        raise
+    _log_intake("WhatsApp", "Success", lead.mobile_no, lead=lead.name)
     return lead
+
+
+def _log_intake(channel, status, identifier, lead=None, error=None):
+    """Mirror of alphax_crm.api.lead_intake._log_intake, for the separate
+    WhatsApp code path — see that module for why this exists: previously
+    neither path left any visible record of what came in or when.
+    """
+    try:
+        doc = frappe.get_doc({
+            "doctype": "AlphaX Lead Intake",
+            "channel": channel,
+            "status": status,
+            "lead": lead,
+            "contact_identifier": identifier,
+            "consent_given": 0,
+            "error": error,
+            "raw_payload": json.dumps({"wa_id": identifier}, default=str),
+        })
+        doc.flags.ignore_permissions = True
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+    except Exception:
+        log_error("whatsapp intake log")
 
 
 # ---------------------------------------------------------------------------

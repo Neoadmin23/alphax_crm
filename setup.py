@@ -5,7 +5,7 @@ with open("requirements.txt") as f:
 
 setup(
     name="alphax_crm",
-    version="0.13.4",
+    version="0.14.0",
     description="Compliance-grade CRM automation for AlphaX on Frappe/ERPNext.",
     author="Neotec Integrated Solutions",
     author_email="support@neotec.ai",

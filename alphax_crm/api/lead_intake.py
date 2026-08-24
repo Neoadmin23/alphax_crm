@@ -58,17 +58,59 @@ def capture(**kwargs):
         except Exception:
             pass
 
+    channel = _resolve_channel(payload)
+    identifier = payload.get("email") or payload.get("email_id") or payload.get("mobile") or payload.get("mobile_no") or ""
+
     try:
         lead = _build_lead(payload, settings)
         lead.insert(ignore_permissions=True)
         frappe.db.commit()
+        _log_intake(channel, "Success", payload, identifier, lead=lead.name)
         return {"ok": True, "lead": lead.name, "score": lead.get("alphax_lead_score")}
     except frappe.DuplicateEntryError:
+        _log_intake(channel, "Duplicate", payload, identifier)
         return {"ok": False, "error": "duplicate"}
     except Exception:
         log_error("intake")
+        _log_intake(channel, "Failed", payload, identifier, error=frappe.get_traceback())
         frappe.local.response["http_status_code"] = 500
         return {"ok": False, "error": "intake_failed"}
+
+
+def _resolve_channel(payload):
+    raw = (payload.get("channel") or payload.get("source") or "").strip().lower()
+    if "whatsapp" in raw:
+        return "WhatsApp"
+    if "meta" in raw or "facebook" in raw or "instagram" in raw:
+        return "Meta Ads"
+    if "google" in raw:
+        return "Google Ads"
+    if "website" in raw or "web" in raw or not raw:
+        return "Website"
+    return "Other"
+
+
+def _log_intake(channel, status, payload, identifier, lead=None, error=None):
+    """Best-effort audit record — never let logging failure break intake
+    itself, since the Lead (or the failure) already happened by the time
+    this runs.
+    """
+    try:
+        doc = frappe.get_doc({
+            "doctype": "AlphaX Lead Intake",
+            "channel": channel,
+            "status": status,
+            "lead": lead,
+            "contact_identifier": identifier,
+            "consent_given": 1 if payload.get("consent") else 0,
+            "error": error,
+            "raw_payload": json.dumps(payload, default=str)[:100000],
+        })
+        doc.flags.ignore_permissions = True
+        doc.insert(ignore_permissions=True)
+        frappe.db.commit()
+    except Exception:
+        log_error("intake log")
 
 
 def _build_lead(payload, settings):
