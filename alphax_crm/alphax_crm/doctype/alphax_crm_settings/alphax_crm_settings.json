@@ -112,15 +112,15 @@
   {"fieldname": "dq_col", "fieldtype": "Column Break"},
   {"fieldname": "dq_rules", "fieldtype": "Table", "label": "Field Rules", "options": "AlphaX Data Quality Rule"},
 
-  {"fieldname": "prospect_section", "fieldtype": "Section Break", "label": "Lead Entry Point \u2192 Lead"},
-  {"fieldname": "prospect_autoconvert", "fieldtype": "Check", "label": "Auto-create Lead when Lead Entry Point is Interested", "default": "1", "description": "When a Prospect is set to a status whose behavior is 'Convert to Lead', a Lead is created automatically with the same owner."},
+  {"fieldname": "prospect_section", "fieldtype": "Section Break", "label": "PreLead \u2192 Lead"},
+  {"fieldname": "prospect_autoconvert", "fieldtype": "Check", "label": "Auto-create Lead when PreLead is Interested", "default": "1", "description": "When a Prospect is set to a status whose behavior is 'Convert to Lead', a Lead is created automatically with the same owner."},
   {"fieldname": "prospect_review_required", "fieldtype": "Check", "label": "Send Created Lead for Review", "default": "1", "description": "Auto-created Leads start at 'Pending Review'. If off, they start 'Approved'."},
-  {"fieldname": "prospect_convert_target", "fieldtype": "Select", "label": "Convert Lead Entry Point To", "options": "Lead (direct)\nSmart Lead then Lead", "default": "Lead (direct)", "description": "Direct: create an ERPNext Lead immediately. Smart Lead: create an AlphaX Smart Lead for structured data entry that maps into the ERPNext Lead on submit (when the Smart Lead module is enabled)."},
-  {"fieldname": "prospect_dimensions_enabled", "fieldtype": "Check", "label": "Enable Accounting Dimensions on Lead Entry Point", "default": "0",
-   "description": "Off by default. Lead and Opportunity get every active Accounting Dimension unconditionally; Lead Entry Point is opt-in and separately restricted to the fields listed below, so turning this on doesn't dump every dimension onto the calling-list form."},
-  {"fieldname": "prospect_dimension_fields", "fieldtype": "Small Text", "label": "Lead Entry Point Dimension Fields", "default": "cost_center",
+  {"fieldname": "prospect_convert_target", "fieldtype": "Select", "label": "Convert PreLead To", "options": "Lead (direct)\nSmart Lead then Lead", "default": "Lead (direct)", "description": "Direct: create an ERPNext Lead immediately. Smart Lead: create an AlphaX Smart Lead for structured data entry that maps into the ERPNext Lead on submit (when the Smart Lead module is enabled)."},
+  {"fieldname": "prospect_dimensions_enabled", "fieldtype": "Check", "label": "Enable Accounting Dimensions on PreLead", "default": "0",
+   "description": "Off by default. Lead and Opportunity get every active Accounting Dimension unconditionally; PreLead is opt-in and separately restricted to the fields listed below, so turning this on doesn't dump every dimension onto the calling-list form."},
+  {"fieldname": "prospect_dimension_fields", "fieldtype": "Small Text", "label": "PreLead Dimension Fields", "default": "cost_center",
    "depends_on": "eval:doc.prospect_dimensions_enabled",
-   "description": "Comma-separated dimension fieldnames to show on Lead Entry Point (a subset of what's active site-wide). Default is Cost Center only. Fieldnames come from Setup > Accounting Dimension (e.g. cost_center, department, business_division, employee_cost_center)."},
+   "description": "Comma-separated dimension fieldnames to show on PreLead (a subset of what's active site-wide). Default is Cost Center only. Fieldnames come from Setup > Accounting Dimension (e.g. cost_center, department, business_division, employee_cost_center). Cost Center is special-cased: since a PreLead can belong to more than one, it shows as a Cost Center + split % table (same pattern as AlphaX Smart Lead) rather than a single dropdown."},
 
   {"fieldname": "activity_monitor_section", "fieldtype": "Section Break", "label": "Activity Monitor", "description": "Track last activity (who / what / when) and idle time on open leads."},
   {"fieldname": "activity_monitor_enabled", "fieldtype": "Check", "label": "Enable Activity Monitor", "default": "1"},
@@ -130,7 +130,7 @@
   {"fieldname": "monitored_statuses", "fieldtype": "Table", "label": "Monitored Statuses", "options": "AlphaX Monitored Status", "description": "Which lead statuses are monitored for idle time. Mark exactly one as Default (used as the on-screen report's default filter)."},
 
   {"fieldname": "dimensions_section", "fieldtype": "Section Break", "label": "Accounting Dimensions"},
-  {"fieldname": "sync_accounting_dimensions", "fieldtype": "Check", "label": "Add Active Accounting Dimensions to CRM Documents", "default": "1", "description": "Auto-adds Link fields (Cost Center, Department, and any active Accounting Dimension such as Business Unit) to Lead, Lead Entry Point and Opportunity, matching whatever is activated in ERPNext."},
+  {"fieldname": "sync_accounting_dimensions", "fieldtype": "Check", "label": "Add Active Accounting Dimensions to CRM Documents", "default": "1", "description": "Auto-adds Link fields (Cost Center, Department, and any active Accounting Dimension such as Business Unit) to Lead, PreLead and Opportunity, matching whatever is activated in ERPNext."},
 
   {"fieldname": "report_fields_section", "fieldtype": "Section Break", "label": "Report Fields & Filters", "description": "Add extra fields (e.g. dimensions like Cost Center / Business Unit, or Territory) to show as columns and be available as filters in the Activity Monitor reports \u2014 no code needed."},
   {"fieldname": "monitor_fields", "fieldtype": "Table", "label": "Extra Report Fields", "options": "AlphaX Monitor Field"},

@@ -1,7 +1,7 @@
 frappe.query_reports["AlphaX Follow-ups Due"] = {
     filters: [
         { fieldname: "agent", label: __("Agent"), fieldtype: "Link", options: "User" },
-        { fieldname: "reference_doctype", label: __("Regarding"), fieldtype: "Select", options: "\nLead\nAlphaX Lead Entry Point\nOpportunity" },
+        { fieldname: "reference_doctype", label: __("Regarding"), fieldtype: "Select", options: "\nLead\nAlphaX PreLead\nOpportunity" },
         { fieldname: "within_days", label: __("Upcoming Within (days)"), fieldtype: "Int" },
     ],
     formatter: function (value, row, column, data, def) {

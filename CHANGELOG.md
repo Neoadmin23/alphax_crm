@@ -3,6 +3,104 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.16.1] — 2026-09-01
+### Changed
+- **PreLead Owner (Sales Person)** is now read-only on the form. It's
+  still set automatically to the creator on a new PreLead (that happens
+  in server-side code, which `read_only` doesn't block — only manual
+  editing through the form UI is disabled). To reassign, use the
+  Assigned To sidebar or a bulk edit.
+
+## [0.16.0] — 2026-09-01
+### Removed
+- **Territory** field removed from AlphaX PreLead (native field, not one of
+  the dynamically-injected accounting-dimension fields). Also removed the
+  now-dead territory-copy code in both conversion paths in `crm/prelead.py`
+  — harmless to leave (the field just always reads empty) but pointless to
+  keep. Lead's own Territory field is untouched; this only affects PreLead.
+
+### Added
+- **PreLead can now belong to multiple cost centers.** Previously Cost
+  Center on PreLead (when the opt-in Accounting Dimensions feature is
+  enabled) was a single flat Link — no way to represent one PreLead
+  spanning more than one cost center. Rather than invent a new mechanism,
+  reused the exact pattern AlphaX Smart Lead already has for this same
+  problem: when "cost_center" is in the enabled dimension fields, PreLead
+  now gets a **Cost Center Splits** table (Business Line + Cost Center +
+  split %) instead of a single dropdown — the same `AlphaX Service
+  Dimension` child doctype Smart Lead already uses, not a second one.
+  Other dimension fields (Department, Business Division, Employee Cost
+  Center) are unaffected and remain flat Links, since only Cost Center was
+  flagged as needing this.
+  On conversion to Lead (both the direct path and via Smart Lead), the
+  splits resolve to a single "primary" cost center — highest split % wins
+  — using the identical resolution Smart Lead already uses for its own
+  splits. Going via Smart Lead, the PreLead's splits are carried into the
+  new Smart Lead's own `service_dimensions` table first, so Smart Lead's
+  existing sync-to-Lead logic picks it up with no special-casing needed
+  there at all.
+  Verified in isolation: the split-resolution logic (highest % wins, empty
+  and None cases) and the field-injection special-casing (`cost_center` →
+  Table, other dimension fields → unaffected Links, `insert_after` chain
+  intact) both behave as designed.
+
+## [0.15.1] — 2026-09-01
+### Changed — supersedes 0.15.0's rename, before it was ever deployed
+- 0.15.0 renamed `AlphaX Prospect` \u2192 `AlphaX Lead Entry Point`, but
+  that version was never actually deployed to the live site (confirmed
+  from a screenshot still showing the original `AlphaX Prospect` label).
+  Renamed again, this time to the final name: **`AlphaX PreLead`** /
+  **`AlphaX PreLead Status`**. Same full scope as 0.15.0's rename
+  (doctype folders, JSON `name`, controller classes now `AlphaXPreLead` /
+  `AlphaXPreLeadStatus`, the business-logic module now `crm/prelead.py`,
+  the form script now `public/js/prelead.js`, the list-view script and
+  filename, every `hooks.py` registration, `DIM_TARGETS`/dimension
+  anchors, the Lead-side Link field's target and label, and every
+  workspace/report/settings label and description) \u2014 plus two
+  additional stale references caught this time that the 0.15.0 pass had
+  left behind: the list view's bulk-convert call still pointed at the old
+  `crm.lead_entry_point` module path, and a docstring in
+  `api/lead_import.py` still named the old list-view filename. Naming
+  series is now `PLD-.YYYY.-`.
+- Since 0.15.0 was never live, the deployment path is simpler than what
+  0.15.0's own notes described: rename directly from `AlphaX Prospect` to
+  `AlphaX PreLead` on the site (see Deployment note below) \u2014 no
+  intermediate `AlphaX Lead Entry Point` state to pass through.
+- Also corrected my own earlier framing: 0.15.0's changelog said
+  historical `patches/*` files were left untouched to preserve history.
+  That's true for descriptive comments/docstrings, but
+  `patches/v0_6/add_dimensions_and_backfill.py` passes a doctype name as
+  a literal function argument (`backfill_activity_monitor([...,
+  "AlphaX Prospect"])`) \u2014 since Frappe replays all historical patches
+  in sequence on a brand-new install, that argument has to match the
+  *current* doctype name to actually work, so it was updated both times
+  (correctly, if not for the reason originally stated).
+- Full-tree verification repeated: `py_compile`, JSON/JS syntax, a
+  repo-wide grep confirming zero references to either old name
+  (`AlphaX Prospect` or `AlphaX Lead Entry Point`) remain, folder/JSON
+  `name`/controller-class agreement for both doctypes, and that
+  `hooks.py`'s function references match what's actually defined in
+  `crm/prelead.py`.
+
+### Deployment note
+Same as 0.15.0's, updated for the final name. An app update alone doesn't
+touch existing `AlphaX Prospect` records or the underlying table. To
+rename the live doctype after deploying this version:
+
+**Via Desk UI:** DocType list \u2192 open **AlphaX Prospect** \u2192
+**\u22ef menu \u2192 Rename** \u2192 `AlphaX PreLead`. Repeat for
+**AlphaX Prospect Status** \u2192 `AlphaX PreLead Status`.
+
+**Via bench:**
+```
+bench --site <site> execute frappe.rename_doc --args "['DocType','AlphaX Prospect','AlphaX PreLead']"
+bench --site <site> execute frappe.rename_doc --args "['DocType','AlphaX Prospect Status','AlphaX PreLead Status']"
+```
+
+Take a backup first and rehearse on staging if possible \u2014 same
+caveats as 0.15.0. Existing records keep their old `PROS-...` names;
+only new records use the `PLD-...` series.
+
 ## [0.15.0] — 2026-08-24
 ### Changed — BREAKING: doctype rename, requires a manual site-side step
 - **Renamed `AlphaX Prospect` \u2192 `AlphaX Lead Entry Point`**, and

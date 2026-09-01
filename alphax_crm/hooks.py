@@ -4,7 +4,7 @@ app_publisher = "Neotec Integrated Solutions"
 app_description = "Compliance-grade CRM automation for AlphaX on Frappe/ERPNext."
 app_email = "support@neotec.ai"
 app_license = "Proprietary"
-app_version = "0.15.0"
+app_version = "0.16.1"
 
 # Requires ERPNext (Lead / Opportunity / CRM doctypes)
 required_apps = ["erpnext"]
@@ -20,7 +20,7 @@ app_include_js = ["/assets/alphax_crm/js/alphax_call.js"]
 doctype_js = {
     "Opportunity": "public/js/opportunity.js",
     "Lead": "public/js/lead.js",
-    "AlphaX Lead Entry Point": "public/js/lead_entry_point.js",
+    "AlphaX PreLead": "public/js/prelead.js",
     "AlphaX Smart Lead": "public/js/smart_lead.js",
 }
 
@@ -51,9 +51,9 @@ doc_events = {
     "Comment": {
         "after_insert": "alphax_crm.crm.activity.on_comment",
     },
-    "AlphaX Lead Entry Point": {
-        "validate": "alphax_crm.crm.lead_entry_point.validate",
-        "on_update": "alphax_crm.crm.lead_entry_point.on_update",
+    "AlphaX PreLead": {
+        "validate": "alphax_crm.crm.prelead.validate",
+        "on_update": "alphax_crm.crm.prelead.on_update",
     },
 }
 

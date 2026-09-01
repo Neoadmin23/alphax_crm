@@ -7,7 +7,7 @@
  "engine": "InnoDB",
  "field_order": ["fieldname", "label", "as_column", "as_filter"],
  "fields": [
-  {"columns": 5, "fieldname": "fieldname", "fieldtype": "Data", "in_list_view": 1, "label": "Fieldname (on Lead/Opportunity/Lead Entry Point)", "reqd": 1, "description": "e.g. cost_center, department, business_unit, territory"},
+  {"columns": 5, "fieldname": "fieldname", "fieldtype": "Data", "in_list_view": 1, "label": "Fieldname (on Lead/Opportunity/PreLead)", "reqd": 1, "description": "e.g. cost_center, department, business_unit, territory"},
   {"columns": 3, "fieldname": "label", "fieldtype": "Data", "in_list_view": 1, "label": "Label"},
   {"columns": 2, "fieldname": "as_column", "fieldtype": "Check", "in_list_view": 1, "label": "Show as Column", "default": "1"},
   {"columns": 2, "fieldname": "as_filter", "fieldtype": "Check", "in_list_view": 1, "label": "Available as Filter", "default": "1"}

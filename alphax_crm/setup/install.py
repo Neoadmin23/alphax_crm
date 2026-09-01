@@ -225,9 +225,9 @@ def setup_custom_fields():
             },
             {
                 "fieldname": "alphax_prospect",
-                "label": "Source Lead Entry Point",
+                "label": "Source PreLead",
                 "fieldtype": "Link",
-                "options": "AlphaX Lead Entry Point",
+                "options": "AlphaX PreLead",
                 "read_only": 1,
                 "insert_after": "alphax_review_status",
             },
@@ -352,10 +352,10 @@ def setup_custom_fields():
 
 
 # ---------------------------------------------------------------------------
-# Accounting dimensions -> Link fields on Lead / Lead Entry Point / Opportunity
+# Accounting dimensions -> Link fields on Lead / PreLead / Opportunity
 # ---------------------------------------------------------------------------
-DIM_TARGETS = ["Lead", "AlphaX Lead Entry Point", "Opportunity"]
-DIM_ANCHOR = {"Lead": "alphax_reviewed_by", "AlphaX Lead Entry Point": "job_title", "Opportunity": "alphax_risk_signal"}
+DIM_TARGETS = ["Lead", "AlphaX PreLead", "Opportunity"]
+DIM_ANCHOR = {"Lead": "alphax_reviewed_by", "AlphaX PreLead": "job_title", "Opportunity": "alphax_risk_signal"}
 
 
 def active_accounting_dimensions():
@@ -395,7 +395,7 @@ def setup_accounting_dimensions():
     for target in DIM_TARGETS:
         if not frappe.db.exists("DocType", target):
             continue
-        if target == "AlphaX Lead Entry Point":
+        if target == "AlphaX PreLead":
             # Opt-in and restricted (default: Cost Center only) — see
             # prospect_dimensions_enabled / prospect_dimension_fields.
             # Lead and Opportunity are unaffected and keep the prior
@@ -423,6 +423,24 @@ def setup_accounting_dimensions():
             })
         prev = "alphax_dimensions_section"
         for fn, label, doctype in target_dims:
+            if target == "AlphaX PreLead" and fn == "cost_center":
+                # A PreLead can belong to more than one cost center — a flat
+                # Link can't represent that. Reuse the exact same
+                # multi-cost-center pattern already proven on AlphaX Smart
+                # Lead (a table of Cost Center + split %, resolved to a
+                # single "primary" cost center — highest split — when
+                # converting to Lead) instead of inventing a second one.
+                if meta.has_field("cost_center_splits"):
+                    prev = "cost_center_splits"
+                    continue
+                if not frappe.db.exists("DocType", "AlphaX Service Dimension"):
+                    continue
+                rows.append({
+                    "fieldname": "cost_center_splits", "fieldtype": "Table", "label": "Cost Center Splits",
+                    "options": "AlphaX Service Dimension", "insert_after": prev,
+                })
+                prev = "cost_center_splits"
+                continue
             if meta.has_field(fn):        # already on the doctype (native or created)
                 prev = fn
                 continue
@@ -555,7 +573,7 @@ def ensure_dq_rules():
 
 
 # ---------------------------------------------------------------------------
-# Lead Entry Point statuses (configurable labels) + prospect defaults
+# PreLead statuses (configurable labels) + prospect defaults
 # ---------------------------------------------------------------------------
 def _default_prospect_statuses():
     # (label, behavior, is_active, is_default, color)
@@ -570,14 +588,14 @@ def _default_prospect_statuses():
 
 
 def seed_prospect_statuses():
-    if not frappe.db.exists("DocType", "AlphaX Lead Entry Point Status"):
+    if not frappe.db.exists("DocType", "AlphaX PreLead Status"):
         return
     for label, behavior, active, default, color in _default_prospect_statuses():
-        if frappe.db.exists("AlphaX Lead Entry Point Status", label):
+        if frappe.db.exists("AlphaX PreLead Status", label):
             continue
         frappe.get_doc(
             {
-                "doctype": "AlphaX Lead Entry Point Status",
+                "doctype": "AlphaX PreLead Status",
                 "status_name": label,
                 "behavior": behavior,
                 "is_active": active,
@@ -589,7 +607,7 @@ def seed_prospect_statuses():
 
 def seed_job_titles():
     """Seed the standard Designation master with AlphaX's known job titles
-    (from the customer's own job-title drop-list), so AlphaX Lead Entry Point's
+    (from the customer's own job-title drop-list), so AlphaX PreLead's
     "Job Title" field — now a Link to Designation instead of free text —
     has a usable list from day one. Reuses Designation (already used
     site-wide for Employees) rather than a new AlphaX-specific master.

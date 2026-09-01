@@ -1,5 +1,5 @@
 """AlphaX Owner Activity Summary — per salesperson: open records, average idle,
-max idle, and overdue count. Works across Lead, Opportunity and Lead Entry Point."""
+max idle, and overdue count. Works across Lead, Opportunity and PreLead."""
 
 import frappe
 from frappe import _
@@ -10,7 +10,7 @@ from alphax_crm.crm.tasks import (
     get_monitor_fields,
 )
 
-TARGET_MAP = {"Lead": "Lead", "Opportunity": "Opportunity", "Lead Entry Point": "AlphaX Lead Entry Point"}
+TARGET_MAP = {"Lead": "Lead", "Opportunity": "Opportunity", "PreLead": "AlphaX PreLead"}
 
 
 def execute(filters=None):

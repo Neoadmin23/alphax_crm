@@ -1,6 +1,6 @@
 """Follow-up mechanism for AlphaX CRM.
 
-A complete, history-keeping follow-up loop for Lead / Lead Entry Point / Opportunity:
+A complete, history-keeping follow-up loop for Lead / PreLead / Opportunity:
 
   * Each AlphaX Follow-up records one touch (channel, direction, outcome,
     duration, summary) and the next step (next action + next follow-up date).
@@ -20,7 +20,7 @@ from frappe.utils import now_datetime, cint
 
 MEDIUM = {"Call": "Phone", "Email": "Email", "WhatsApp": "Chat", "SMS": "SMS",
           "Meeting": "Event", "Visit": "Visit", "Other": "Other"}
-NEXT_DATE_FIELD = {"Lead": "alphax_next_contact_date", "AlphaX Lead Entry Point": "follow_up_date",
+NEXT_DATE_FIELD = {"Lead": "alphax_next_contact_date", "AlphaX PreLead": "follow_up_date",
                    "Opportunity": "alphax_next_activity_date"}
 
 

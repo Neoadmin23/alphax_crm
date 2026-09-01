@@ -30,7 +30,7 @@
   {"fieldname": "request_type", "fieldtype": "Select", "label": "Request Type", "options": "\nRequest for Information\nRequest for Quotation\nDemo\nOther"},
   {"fieldname": "preferred_language", "fieldtype": "Select", "label": "Preferred Language", "options": "Arabic\nEnglish\nArabic + English", "default": "Arabic + English"},
   {"fieldname": "industry", "fieldtype": "Link", "label": "Business Domain", "options": "Industry Type",
-   "description": "The customer's business domain/sector. Uses the same global Industry Type list as Lead Entry Point and Lead, so values carry through the whole pipeline. Type to search, or pick \"Create a New Industry Type\" at the bottom of the list to add one."},
+   "description": "The customer's business domain/sector. Uses the same global Industry Type list as PreLead and Lead, so values carry through the whole pipeline. Type to search, or pick \"Create a New Industry Type\" at the bottom of the list to add one."},
 
   {"fieldname": "contact_section", "fieldtype": "Section Break", "label": "Contact"},
   {"fieldname": "mobile_no", "fieldtype": "Data", "label": "Mobile No", "options": "Phone"},
@@ -71,7 +71,7 @@
    "description": "Automatic, non-blocking checks that run on save \u2014 nothing here stops you from saving."},
   {"fieldname": "alphax_dq_score", "fieldtype": "Int", "label": "Data Completeness %", "read_only": 1},
   {"fieldname": "possible_duplicate", "fieldtype": "Small Text", "label": "Possible Duplicate(s)", "read_only": 1,
-   "description": "Existing Lead/Lead Entry Point/Smart Lead records matching this email or mobile number, checked live as you type."},
+   "description": "Existing Lead/PreLead/Smart Lead records matching this email or mobile number, checked live as you type."},
   {"fieldname": "dq_col", "fieldtype": "Column Break"},
   {"fieldname": "alphax_dq_report", "fieldtype": "Small Text", "label": "Completeness Report", "read_only": 1},
 

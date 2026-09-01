@@ -14,5 +14,5 @@ def execute():
     setup_custom_fields()
     ensure_activity_monitor_defaults()
     setup_accounting_dimensions()
-    backfill_activity_monitor(["Lead", "Opportunity", "AlphaX Lead Entry Point"])
+    backfill_activity_monitor(["Lead", "Opportunity", "AlphaX PreLead"])
     frappe.db.commit()

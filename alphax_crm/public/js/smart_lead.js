@@ -51,7 +51,7 @@ frappe.ui.form.on("AlphaX Smart Lead", {
 });
 
 // Live duplicate check — fires on email/mobile blur, non-blocking. Checks
-// Lead, AlphaX Lead Entry Point, and AlphaX Smart Lead by email or mobile, and
+// Lead, AlphaX PreLead, and AlphaX Smart Lead by email or mobile, and
 // writes a short summary into the read-only "Possible Duplicate(s)" field
 // so it's visible even to someone reviewing the record later, not just at
 // data-entry time.
