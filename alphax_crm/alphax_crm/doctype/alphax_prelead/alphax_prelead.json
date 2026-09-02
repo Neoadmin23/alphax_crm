@@ -13,6 +13,8 @@
   "column_break_head",
   "status",
   "prospect_owner",
+  "owner",
+  "website",
   "contact_section",
   "email_id",
   "mobile_no",
@@ -83,6 +85,19 @@
    "in_standard_filter": 1,
    "read_only": 1,
    "description": "Set automatically to the creator; not user-editable from the form. Reassign via the Assigned To sidebar or a bulk edit if it needs to change."
+  },
+  {
+   "fieldname": "owner",
+   "fieldtype": "Link",
+   "label": "Created By",
+   "options": "User",
+   "read_only": 1,
+   "description": "The actual record creator, from Frappe's own system tracking \u2014 distinct from PreLead Owner above, which can be reassigned to someone else later while this never changes."
+  },
+  {
+   "fieldname": "website",
+   "fieldtype": "Data",
+   "label": "Company Website"
   },
   {
    "fieldname": "contact_section",

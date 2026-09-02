@@ -197,6 +197,8 @@ def _convert_to_lead(doc, settings):
         lead.city = doc.city
     if doc.get("job_title") and meta.has_field("job_title"):
         lead.job_title = doc.job_title
+    if doc.get("website") and meta.has_field("website"):
+        lead.website = doc.website
 
     # Carry over any accounting dimensions present on both docs. Cost
     # Center is handled separately below since a PreLead can have several
@@ -293,6 +295,7 @@ def _convert_via_smart_lead(doc, settings):
     sl.mobile_no = doc.get("mobile_no")
     sl.phone = doc.get("phone")
     sl.job_title = doc.get("job_title")
+    sl.website = doc.get("website")
     if doc.get("source") and frappe.db.exists("Lead Source", doc.source):
         sl.lead_source = doc.source
     sl.lead_owner = doc.get("prospect_owner") or frappe.session.user

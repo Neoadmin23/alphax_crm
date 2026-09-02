@@ -3,6 +3,24 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.17.0] — 2026-09-01
+### Added
+- Two new fields on AlphaX PreLead, in the previously-empty gap in the
+  identity section (right column, below Status):
+  - **Created By** (`owner`, read-only, Link → User) — Frappe's own
+    built-in record-creator tracking, exposed on the form. Deliberately
+    distinct from the existing **PreLead Owner (Sales Person)** field:
+    Owner can be reassigned later (via Assigned To or a bulk edit); this
+    can't, since it's who actually created the record.
+  - **Company Website** (`website`, Data).
+- Wired `website` through both conversion paths in `crm/prelead.py`
+  (direct to Lead, and via Smart Lead — Lead and Smart Lead both already
+  have their own `website` field) so it isn't a dead-end form field.
+  Also: Smart Import's column-alias table already had a `website` entry
+  (LinkedIn Profile / linkedin / website url) from 0.10.3 that silently
+  did nothing for Prospect/PreLead imports because the field didn't
+  exist — it now activates automatically, no code change needed there.
+
 ## [0.16.1] — 2026-09-01
 ### Changed
 - **PreLead Owner (Sales Person)** is now read-only on the form. It's
