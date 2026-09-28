@@ -1,0 +1,44 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-09-20 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "lead_status",
+  "lead_stage"
+ ],
+ "fields": [
+  {
+   "columns": 5,
+   "description": "Value of the \"Lead Status\" field (custom_lead_status) that triggers this mapping.",
+   "fieldname": "lead_status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "When Lead Status is",
+   "reqd": 1
+  },
+  {
+   "columns": 5,
+   "description": "\"Lead Stage\" (the native Status field) to set automatically.",
+   "fieldname": "lead_stage",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Auto-set Lead Stage to",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AlphaX CRM",
+ "name": "AlphaX Lead Stage Map",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "ASC",
+ "states": []
+}
