@@ -1,0 +1,29 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["field", "label", "requirement", "validation", "param", "message"],
+ "fields": [
+  {"columns": 2, "fieldname": "field", "fieldtype": "Data", "in_list_view": 1, "label": "Lead Fieldname", "reqd": 1, "description": "Fieldname on the Lead doctype, e.g. email_id"},
+  {"columns": 2, "fieldname": "label", "fieldtype": "Data", "in_list_view": 1, "label": "Display Label", "description": "Optional; defaults to the field label"},
+  {"columns": 2, "fieldname": "requirement", "fieldtype": "Select", "in_list_view": 1, "label": "Requirement", "options": "Required\nRecommended", "default": "Required"},
+  {"columns": 2, "fieldname": "validation", "fieldtype": "Select", "in_list_view": 1, "label": "Validation", "options": "Any Value\nEmail\nSaudi Mobile\nPhone\nNumber\nPositive Number\nVAT Number (KSA)\nNational ID / Iqama\nCR Number\nURL\nRegex\nMin Length", "default": "Any Value"},
+  {"columns": 2, "fieldname": "param", "fieldtype": "Data", "in_list_view": 1, "label": "Parameter", "description": "Regex pattern (Regex) or minimum length (Min Length)"},
+  {"fieldname": "message", "fieldtype": "Small Text", "label": "Custom Error Message"}
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AlphaX CRM",
+ "name": "AlphaX Data Quality Rule",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
