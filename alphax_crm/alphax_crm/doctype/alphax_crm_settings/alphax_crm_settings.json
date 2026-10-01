@@ -1,0 +1,914 @@
+{
+ "actions": [],
+ "creation": "2026-01-01 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "scoring_section",
+  "scoring_enabled",
+  "auto_opportunity_enabled",
+  "auto_opportunity_threshold",
+  "engagement_points",
+  "engagement_cap",
+  "score_rules",
+  "dedup_section",
+  "dedup_enabled",
+  "dedup_fields",
+  "dedup_action",
+  "dq_section",
+  "data_quality_enabled",
+  "dq_enforce_on",
+  "dq_gate_from_statuses",
+  "dq_block_incomplete",
+  "dq_skip_for_intake",
+  "dq_min_completeness",
+  "dq_col",
+  "dq_rules",
+  "prospect_section",
+  "prospect_autoconvert",
+  "prospect_review_required",
+  "prospect_convert_target",
+  "prospect_dimensions_enabled",
+  "prospect_dimension_fields",
+  "stage_automation_section",
+  "auto_set_stage_from_status",
+  "track_stage_durations",
+  "sa_col",
+  "lead_stage_map",
+  "stage_flow_section",
+  "stage_flow_enabled",
+  "stage_transitions",
+  "stage_flow_col",
+  "stage_flow_bypass_roles",
+  "closure_section",
+  "closure_controls_enabled",
+  "won_stage_value",
+  "lost_stage_values",
+  "closure_col",
+  "contract_signed_value",
+  "require_customer_for_won",
+  "wf_section",
+  "approver_role",
+  "notify_approvers_on_quotation",
+  "wf_col",
+  "postponed_stage_value",
+  "postponed_default_revisit_days",
+  "lost_quotation_stage_value",
+  "lost_quotation_digest_enabled",
+  "stage_sla_section",
+  "stage_sla_enabled",
+  "stage_sla_rules",
+  "activity_monitor_section",
+  "activity_monitor_enabled",
+  "default_idle_threshold_days",
+  "capture_status_change",
+  "am_col",
+  "monitored_statuses",
+  "schedule_reminders_enabled",
+  "dimensions_section",
+  "sync_accounting_dimensions",
+  "report_fields_section",
+  "monitor_fields",
+  "smart_lead_section",
+  "smart_lead_autocreate",
+  "smart_lead_map",
+  "na_api_section",
+  "na_api_url",
+  "na_api_key",
+  "routing_section",
+  "first_followup_days",
+  "default_source",
+  "intake_token",
+  "whatsapp_section",
+  "whatsapp_enabled",
+  "whatsapp_phone_number_id",
+  "whatsapp_access_token",
+  "whatsapp_verify_token",
+  "whatsapp_app_secret",
+  "whatsapp_api_version",
+  "whatsapp_default_source",
+  "whatsapp_download_media",
+  "whatsapp_col",
+  "whatsapp_auto_ack",
+  "whatsapp_ack_mode",
+  "whatsapp_ack_text",
+  "whatsapp_ack_template",
+  "whatsapp_ack_language",
+  "stale_section",
+  "stale_detection_enabled",
+  "stale_lead_days",
+  "stale_opportunity_days",
+  "stale_action",
+  "reassign_pool",
+  "stale_batch_size",
+  "ai_section",
+  "ai_enabled",
+  "ai_base_url",
+  "ai_chat_path",
+  "ai_model",
+  "ai_api_key",
+  "ai_timeout",
+  "ai_col",
+  "ai_classify_leads",
+  "ai_draft_reply",
+  "ai_summarize_opportunity",
+  "ai_bilingual",
+  "ai_server_setup_section",
+  "ai_server_setup_help",
+  "ai_setup_token",
+  "ai_cf_access_section",
+  "ai_cf_access_help",
+  "ai_cf_access_client_id",
+  "ai_cf_access_client_secret",
+  "sales_analytics_section",
+  "won_status",
+  "lost_status",
+  "sa_analytics_col",
+  "dashboard_default_range_days",
+  "pdpl_section",
+  "pdpl_retention_enabled",
+  "pdpl_retention_days",
+  "pdpl_retention_action",
+  "retention_batch_size"
+ ],
+ "fields": [
+  {
+   "fieldname": "scoring_section",
+   "fieldtype": "Section Break",
+   "label": "Lead Scoring"
+  },
+  {
+   "fieldname": "scoring_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Lead Scoring",
+   "default": "1"
+  },
+  {
+   "fieldname": "auto_opportunity_enabled",
+   "fieldtype": "Check",
+   "label": "Auto-create Opportunity for Hot Leads",
+   "default": "1"
+  },
+  {
+   "fieldname": "auto_opportunity_threshold",
+   "fieldtype": "Int",
+   "label": "Auto-Opportunity Score Threshold",
+   "default": "70"
+  },
+  {
+   "fieldname": "engagement_points",
+   "fieldtype": "Int",
+   "label": "Points per Engagement",
+   "default": "2"
+  },
+  {
+   "fieldname": "engagement_cap",
+   "fieldtype": "Int",
+   "label": "Engagement Points Cap",
+   "default": "20"
+  },
+  {
+   "fieldname": "score_rules",
+   "fieldtype": "Table",
+   "label": "Score Rules",
+   "options": "AlphaX Lead Score Rule"
+  },
+  {
+   "fieldname": "dedup_section",
+   "fieldtype": "Section Break",
+   "label": "De-duplication"
+  },
+  {
+   "fieldname": "dedup_enabled",
+   "fieldtype": "Check",
+   "label": "Enable De-duplication",
+   "default": "1"
+  },
+  {
+   "fieldname": "dedup_fields",
+   "fieldtype": "Small Text",
+   "label": "De-dup Fields (comma separated)",
+   "default": "email_id,mobile_no,phone"
+  },
+  {
+   "fieldname": "dedup_action",
+   "fieldtype": "Select",
+   "label": "On Duplicate",
+   "options": "Warn\nBlock",
+   "default": "Warn"
+  },
+  {
+   "fieldname": "dq_section",
+   "fieldtype": "Section Break",
+   "label": "Data Quality Gate",
+   "description": "Require selected fields to be filled and correct before a lead is qualified/converted \u2014 even non-mandatory fields."
+  },
+  {
+   "fieldname": "data_quality_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Data Quality Gate",
+   "default": "1"
+  },
+  {
+   "fieldname": "dq_enforce_on",
+   "fieldtype": "Select",
+   "label": "Enforce On",
+   "options": "Qualify or Convert\nOn Save\nBoth",
+   "default": "Qualify or Convert",
+   "description": "When to enforce. 'Qualify or Convert' lets raw leads be captured but blocks incomplete data when moving forward."
+  },
+  {
+   "fieldname": "dq_gate_from_statuses",
+   "fieldtype": "Small Text",
+   "label": "Gate When Leaving Status",
+   "default": "Lead",
+   "depends_on": "eval:doc.dq_enforce_on!=\"On Save\"",
+   "description": "Comma-separated Lead status value(s). Under 'Qualify or Convert' (or 'Both'), the gate fires when status is changing away from one of these \u2014 not into a specific status \u2014 so it works with any custom status list, including this site's own (Lead, Interested, Qualified lead, Proposal sent, Won, ...). Default 'Lead' means: nothing else here matters if you never leave the initial status, but complete data is required the moment you try to move it anywhere else."
+  },
+  {
+   "fieldname": "dq_block_incomplete",
+   "fieldtype": "Check",
+   "label": "Block if Incomplete",
+   "default": "1",
+   "description": "If off, incomplete data only warns instead of blocking."
+  },
+  {
+   "fieldname": "dq_skip_for_intake",
+   "fieldtype": "Check",
+   "label": "Skip for Auto-captured Leads",
+   "default": "1",
+   "description": "Do not gate leads created by the intake / WhatsApp webhooks on capture."
+  },
+  {
+   "fieldname": "dq_min_completeness",
+   "fieldtype": "Int",
+   "label": "Minimum Completeness %",
+   "default": "0",
+   "description": "0 = no percentage gate. Otherwise the required-field completeness must reach this %."
+  },
+  {
+   "fieldname": "dq_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dq_rules",
+   "fieldtype": "Table",
+   "label": "Field Rules",
+   "options": "AlphaX Data Quality Rule"
+  },
+  {
+   "fieldname": "prospect_section",
+   "fieldtype": "Section Break",
+   "label": "PreLead \u2192 Lead"
+  },
+  {
+   "fieldname": "prospect_autoconvert",
+   "fieldtype": "Check",
+   "label": "Auto-create Lead when PreLead is Interested",
+   "default": "1",
+   "description": "When a Prospect is set to a status whose behavior is 'Convert to Lead', a Lead is created automatically with the same owner."
+  },
+  {
+   "fieldname": "prospect_review_required",
+   "fieldtype": "Check",
+   "label": "Send Created Lead for Review",
+   "default": "1",
+   "description": "Auto-created Leads start at 'Pending Review'. If off, they start 'Approved'."
+  },
+  {
+   "fieldname": "prospect_convert_target",
+   "fieldtype": "Select",
+   "label": "Convert PreLead To",
+   "options": "Lead (direct)\nSmart Lead then Lead",
+   "default": "Lead (direct)",
+   "description": "Direct: create an ERPNext Lead immediately. Smart Lead: create an AlphaX Smart Lead for structured data entry that maps into the ERPNext Lead on submit (when the Smart Lead module is enabled)."
+  },
+  {
+   "fieldname": "prospect_dimensions_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Accounting Dimensions on PreLead",
+   "default": "0",
+   "description": "Off by default. Lead and Opportunity get every active Accounting Dimension unconditionally; PreLead is opt-in and separately restricted to the fields listed below, so turning this on doesn't dump every dimension onto the calling-list form."
+  },
+  {
+   "fieldname": "prospect_dimension_fields",
+   "fieldtype": "Small Text",
+   "label": "PreLead Dimension Fields",
+   "default": "cost_center",
+   "depends_on": "eval:doc.prospect_dimensions_enabled",
+   "description": "Comma-separated dimension fieldnames to show on PreLead (a subset of what's active site-wide). Default is Cost Center only. Fieldnames come from Setup > Accounting Dimension (e.g. cost_center, department, business_division, employee_cost_center). Cost Center is special-cased: since a PreLead can belong to more than one, it shows as a Cost Center + split % table (same pattern as AlphaX Smart Lead) rather than a single dropdown."
+  },
+  {
+   "fieldname": "stage_automation_section",
+   "fieldtype": "Section Break",
+   "label": "Lead Stage Automation (AI Gap-Filling)"
+  },
+  {
+   "default": "1",
+   "description": "When the \"Lead Status\" field (Lead / Prospect / Cold Lead / Inactive Lead / Successful / Customer) changes, automatically set \"Lead Stage\" (the native Status field) using the mapping below \u2014 instead of relying on a human to remember to update both.",
+   "fieldname": "auto_set_stage_from_status",
+   "fieldtype": "Check",
+   "label": "Auto-set Lead Stage from Lead Status"
+  },
+  {
+   "default": "1",
+   "description": "Log every Lead Status / Lead Stage / Workflow State change to AlphaX Stage Transition Log, including the day-gap since that same field last changed on that record.",
+   "fieldname": "track_stage_durations",
+   "fieldtype": "Check",
+   "label": "Track day-gap between stage changes"
+  },
+  {
+   "fieldname": "sa_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "lead_stage_map",
+   "fieldtype": "Table",
+   "label": "Lead Status \u2192 Lead Stage Mapping",
+   "options": "AlphaX Lead Stage Map"
+  },
+  {
+   "fieldname": "stage_flow_section",
+   "fieldtype": "Section Break",
+   "label": "Stage Progression Control (WF-01)",
+   "description": "Stages cannot be skipped \u2014 a Lead Stage change is only allowed to save if it matches one of the From \u2192 To pairs below. Add, remove or rename rows freely; an empty table turns this check off entirely (nothing is enforced until at least one row exists)."
+  },
+  {
+   "fieldname": "stage_flow_enabled",
+   "fieldtype": "Check",
+   "label": "Enforce Approved Stage Flow",
+   "default": "1"
+  },
+  {
+   "fieldname": "stage_transitions",
+   "fieldtype": "Table",
+   "label": "Approved Transitions (From \u2192 To)",
+   "options": "AlphaX Lead Stage Transition"
+  },
+  {
+   "fieldname": "stage_flow_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stage_flow_bypass_roles",
+   "fieldtype": "Small Text",
+   "label": "Roles That Can Bypass (comma separated)",
+   "default": "System Manager,Sales Manager",
+   "description": "Anyone holding one of these roles can move a Lead to any stage directly \u2014 for correcting a mistake, or an exception the approved flow doesn't cover."
+  },
+  {
+   "fieldname": "closure_section",
+   "fieldtype": "Section Break",
+   "label": "Closure Controls (WF-06)",
+   "description": "A Lead cannot be saved at the \"Won\" or a \"Lost\" stage until its required closure fields (Contract, Won Or Lost Date, and \u2014 for a Lost stage \u2014 Lost Reason and Detailed Reason, the same fields the Lead form itself shows for that stage) are filled in."
+  },
+  {
+   "fieldname": "closure_controls_enabled",
+   "fieldtype": "Check",
+   "label": "Enforce Closure Controls",
+   "default": "1"
+  },
+  {
+   "fieldname": "won_stage_value",
+   "fieldtype": "Data",
+   "label": "\"Won\" Lead Stage Value",
+   "default": "Won"
+  },
+  {
+   "fieldname": "lost_stage_values",
+   "fieldtype": "Small Text",
+   "label": "\"Lost\" Lead Stage Value(s) (comma separated)",
+   "default": "Lost with reason,Lost Quotation"
+  },
+  {
+   "fieldname": "closure_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "contract_signed_value",
+   "fieldtype": "Data",
+   "label": "Required Contract Value for Won",
+   "default": "Signed"
+  },
+  {
+   "fieldname": "require_customer_for_won",
+   "fieldtype": "Check",
+   "label": "Require Linked Customer for Won",
+   "default": "1",
+   "description": "Checks that a Customer record exists with this Lead set as its source Lead (created via the Lead's own \"Create > Customer\" action)."
+  },
+  {
+   "fieldname": "wf_section",
+   "fieldtype": "Section Break",
+   "label": "Approvals & Quotation Notifications (WF-02, WF-03)",
+   "description": "\"Approver\" throughout this app's automation means whoever holds this role — change it here once rather than in five different places."
+  },
+  {
+   "fieldname": "approver_role",
+   "fieldtype": "Data",
+   "label": "Approver Role",
+   "default": "Sales Manager",
+   "description": "The role notified as \"Sales Manager / Approver\" by every WF rule below (quotation creation, SLA escalations, Postponed/Contract Under Signing checks, Lost Quotation digest)."
+  },
+  {
+   "fieldname": "notify_approvers_on_quotation",
+   "fieldtype": "Check",
+   "label": "Notify Approvers When Any Quotation Is Submitted",
+   "default": "1"
+  },
+  {
+   "fieldname": "wf_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "postponed_stage_value",
+   "fieldtype": "Data",
+   "label": "\"Postponed\" Lead Stage Value",
+   "default": "Postponed"
+  },
+  {
+   "fieldname": "postponed_default_revisit_days",
+   "fieldtype": "Int",
+   "label": "Revisit After (days, if no Next Contact Date set)",
+   "default": "30"
+  },
+  {
+   "fieldname": "lost_quotation_stage_value",
+   "fieldtype": "Data",
+   "label": "\"Lost Quotation\" Lead Stage Value",
+   "default": "Lost Quotation"
+  },
+  {
+   "fieldname": "lost_quotation_digest_enabled",
+   "fieldtype": "Check",
+   "label": "Send Daily Lost-Quotation Digest to Approvers",
+   "default": "1"
+  },
+  {
+   "fieldname": "stage_sla_section",
+   "fieldtype": "Section Break",
+   "label": "Stage Activity Monitoring / SLA (WF-05)",
+   "description": "One row per reminder or escalation milestone. \"Days In Stage\" counts from when the Lead most recently entered that Stage. Add as many rows per stage as needed (e.g. a first reminder, a second reminder, then an escalation to the Approver) — nothing here is hardcoded to a fixed day count."
+  },
+  {
+   "fieldname": "stage_sla_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Stage SLA Reminders",
+   "default": "1"
+  },
+  {
+   "fieldname": "stage_sla_rules",
+   "fieldtype": "Table",
+   "label": "Stage SLA Rules",
+   "options": "AlphaX Lead Stage SLA"
+  },
+  {
+   "fieldname": "activity_monitor_section",
+   "fieldtype": "Section Break",
+   "label": "Activity Monitor",
+   "description": "Track last activity (who / what / when) and idle time on open leads."
+  },
+  {
+   "fieldname": "activity_monitor_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Activity Monitor",
+   "default": "1"
+  },
+  {
+   "fieldname": "default_idle_threshold_days",
+   "fieldtype": "Int",
+   "label": "Default Idle Threshold (days)",
+   "default": "3",
+   "description": "Used when a monitored status has no threshold of its own."
+  },
+  {
+   "fieldname": "capture_status_change",
+   "fieldtype": "Check",
+   "label": "Count Status Change as Activity",
+   "default": "1"
+  },
+  {
+   "fieldname": "am_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "monitored_statuses",
+   "fieldtype": "Table",
+   "label": "Monitored Statuses",
+   "options": "AlphaX Monitored Status",
+   "description": "Which lead statuses are monitored for idle time. Mark exactly one as Default (used as the on-screen report's default filter)."
+  },
+  {
+   "default": "1",
+   "description": "Daily digest to each agent listing their overdue \"Next Follow-up\" items (from Log Follow-up), so a missed promised action doesn't go unnoticed.",
+   "fieldname": "schedule_reminders_enabled",
+   "fieldtype": "Check",
+   "label": "Notify agents of overdue schedules"
+  },
+  {
+   "fieldname": "dimensions_section",
+   "fieldtype": "Section Break",
+   "label": "Accounting Dimensions"
+  },
+  {
+   "fieldname": "sync_accounting_dimensions",
+   "fieldtype": "Check",
+   "label": "Add Active Accounting Dimensions to CRM Documents",
+   "default": "1",
+   "description": "Auto-adds Link fields (Cost Center, Department, and any active Accounting Dimension such as Business Unit) to Lead, PreLead and Opportunity, matching whatever is activated in ERPNext."
+  },
+  {
+   "fieldname": "report_fields_section",
+   "fieldtype": "Section Break",
+   "label": "Report Fields & Filters",
+   "description": "Add extra fields (e.g. dimensions like Cost Center / Business Unit, or Territory) to show as columns and be available as filters in the Activity Monitor reports \u2014 no code needed."
+  },
+  {
+   "fieldname": "monitor_fields",
+   "fieldtype": "Table",
+   "label": "Extra Report Fields",
+   "options": "AlphaX Monitor Field"
+  },
+  {
+   "fieldname": "smart_lead_section",
+   "fieldtype": "Section Break",
+   "label": "Smart Lead \u2192 ERPNext Lead",
+   "description": "Smart Lead is the clean entry screen; on save it maps into the ERPNext Lead using the field map below."
+  },
+  {
+   "fieldname": "smart_lead_autocreate",
+   "fieldtype": "Check",
+   "label": "Create / update Lead automatically on save",
+   "default": "1"
+  },
+  {
+   "fieldname": "smart_lead_map",
+   "fieldtype": "Table",
+   "label": "Field Map (Smart Lead \u2192 Lead)",
+   "options": "AlphaX Smart Lead Map"
+  },
+  {
+   "fieldname": "na_api_section",
+   "fieldtype": "Section Break",
+   "label": "Saudi National Address (SPL)",
+   "collapsible": 1,
+   "description": "Optional. Credentials for live National Address lookup from Saudi Post (SPL / address.gov.sa)."
+  },
+  {
+   "fieldname": "na_api_url",
+   "fieldtype": "Data",
+   "label": "National Address API URL"
+  },
+  {
+   "fieldname": "na_api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "routing_section",
+   "fieldtype": "Section Break",
+   "label": "Routing & Intake"
+  },
+  {
+   "fieldname": "first_followup_days",
+   "fieldtype": "Int",
+   "label": "First Follow-up After (days)",
+   "default": "1"
+  },
+  {
+   "fieldname": "default_source",
+   "fieldtype": "Data",
+   "label": "Default Lead Source",
+   "default": "Campaign"
+  },
+  {
+   "fieldname": "intake_token",
+   "fieldtype": "Password",
+   "label": "Intake Webhook Token"
+  },
+  {
+   "fieldname": "whatsapp_section",
+   "fieldtype": "Section Break",
+   "label": "WhatsApp Business (Cloud API)"
+  },
+  {
+   "fieldname": "whatsapp_enabled",
+   "fieldtype": "Check",
+   "label": "Enable WhatsApp Intake",
+   "default": "0"
+  },
+  {
+   "fieldname": "whatsapp_phone_number_id",
+   "fieldtype": "Data",
+   "label": "Phone Number ID",
+   "description": "From Meta > WhatsApp > API Setup."
+  },
+  {
+   "fieldname": "whatsapp_access_token",
+   "fieldtype": "Password",
+   "label": "Access Token"
+  },
+  {
+   "fieldname": "whatsapp_verify_token",
+   "fieldtype": "Password",
+   "label": "Webhook Verify Token",
+   "description": "Any secret string; enter the same value in the Meta webhook config."
+  },
+  {
+   "fieldname": "whatsapp_app_secret",
+   "fieldtype": "Password",
+   "label": "App Secret",
+   "description": "Used to validate the X-Hub-Signature-256 signature on inbound events."
+  },
+  {
+   "fieldname": "whatsapp_api_version",
+   "fieldtype": "Data",
+   "label": "Graph API Version",
+   "default": "v21.0"
+  },
+  {
+   "fieldname": "whatsapp_default_source",
+   "fieldtype": "Data",
+   "label": "Lead Source for WhatsApp",
+   "default": "WhatsApp"
+  },
+  {
+   "fieldname": "whatsapp_download_media",
+   "fieldtype": "Check",
+   "label": "Download Inbound Media to Lead",
+   "default": "0"
+  },
+  {
+   "fieldname": "whatsapp_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "whatsapp_auto_ack",
+   "fieldtype": "Check",
+   "label": "Send Auto-Acknowledgment",
+   "default": "1"
+  },
+  {
+   "fieldname": "whatsapp_ack_mode",
+   "fieldtype": "Select",
+   "label": "Acknowledgment Mode",
+   "options": "Text\nTemplate",
+   "default": "Text",
+   "description": "Text replies are only allowed inside the 24h customer-service window (fine for inbound). Use Template to reply outside it."
+  },
+  {
+   "fieldname": "whatsapp_ack_text",
+   "fieldtype": "Small Text",
+   "label": "Acknowledgment Text",
+   "default": "\u0634\u0643\u0631\u064b\u0627 \u0644\u062a\u0648\u0627\u0635\u0644\u0643 \u0645\u0639 AlphaX. \u0633\u064a\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0643 \u0623\u062d\u062f \u0645\u0645\u062b\u0644\u064a\u0646\u0627 \u0642\u0631\u064a\u0628\u064b\u0627.\nThank you for contacting AlphaX. One of our representatives will reach out shortly."
+  },
+  {
+   "fieldname": "whatsapp_ack_template",
+   "fieldtype": "Data",
+   "label": "Acknowledgment Template Name"
+  },
+  {
+   "fieldname": "whatsapp_ack_language",
+   "fieldtype": "Data",
+   "label": "Template Language Code",
+   "default": "en_US"
+  },
+  {
+   "fieldname": "stale_section",
+   "fieldtype": "Section Break",
+   "label": "Stale-Deal Detection"
+  },
+  {
+   "fieldname": "stale_detection_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Stale Detection",
+   "default": "1"
+  },
+  {
+   "fieldname": "stale_lead_days",
+   "fieldtype": "Int",
+   "label": "Lead Inactivity Threshold (days)",
+   "default": "5"
+  },
+  {
+   "fieldname": "stale_opportunity_days",
+   "fieldtype": "Int",
+   "label": "Opportunity Inactivity Threshold (days)",
+   "default": "7"
+  },
+  {
+   "fieldname": "stale_action",
+   "fieldtype": "Select",
+   "label": "Stale Action",
+   "options": "Notify Owner\nReassign\nBoth",
+   "default": "Notify Owner"
+  },
+  {
+   "fieldname": "reassign_pool",
+   "fieldtype": "Small Text",
+   "label": "Reassignment Pool (user emails, comma separated)"
+  },
+  {
+   "fieldname": "stale_batch_size",
+   "fieldtype": "Int",
+   "label": "Scan Batch Size",
+   "default": "200"
+  },
+  {
+   "fieldname": "ai_section",
+   "fieldtype": "Section Break",
+   "label": "AI Assist (Local / PDPL-clean)"
+  },
+  {
+   "fieldname": "ai_enabled",
+   "fieldtype": "Check",
+   "label": "Enable AI Assist",
+   "default": "0"
+  },
+  {
+   "fieldname": "ai_base_url",
+   "fieldtype": "Data",
+   "label": "AI Base URL",
+   "default": "http://localhost:11434",
+   "description": "Ollama-compatible local endpoint. No data leaves the host."
+  },
+  {
+   "fieldname": "ai_chat_path",
+   "fieldtype": "Data",
+   "label": "Chat Path",
+   "default": "/api/chat"
+  },
+  {
+   "fieldname": "ai_model",
+   "fieldtype": "Data",
+   "label": "Model",
+   "default": "llama3.1"
+  },
+  {
+   "fieldname": "ai_api_key",
+   "fieldtype": "Password",
+   "label": "API Key (optional)"
+  },
+  {
+   "fieldname": "ai_timeout",
+   "fieldtype": "Int",
+   "label": "Timeout (s)",
+   "default": "60"
+  },
+  {
+   "fieldname": "ai_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_classify_leads",
+   "fieldtype": "Check",
+   "label": "Classify Leads (fit / urgency / intent)",
+   "default": "1"
+  },
+  {
+   "fieldname": "ai_draft_reply",
+   "fieldtype": "Check",
+   "label": "Draft First Reply",
+   "default": "1"
+  },
+  {
+   "fieldname": "ai_summarize_opportunity",
+   "fieldtype": "Check",
+   "label": "Summarize Opportunities",
+   "default": "1"
+  },
+  {
+   "fieldname": "ai_bilingual",
+   "fieldtype": "Check",
+   "label": "Bilingual (Arabic + English)",
+   "default": "1"
+  },
+  {
+   "fieldname": "ai_server_setup_section",
+   "fieldtype": "Section Break",
+   "label": "Local AI Server Setup (Ollama)"
+  },
+  {
+   "fieldname": "ai_server_setup_help",
+   "fieldtype": "HTML",
+   "options": "<div class='text-muted small'>Install a free, local AI model (Ollama) once on a shared office PC/server, then every AlphaX CRM user gets AI Assist through it \u2014 no data leaves your network to a third-party AI vendor. Pick your server's operating system below to download a ready-to-run setup script: it installs Ollama, lets you choose a model size, and opens a secure tunnel so this site can reach it. When the script finishes it fills in AI Base URL and Model above on its own \u2014 nothing to copy or paste. Save this form once, then use Test AI Connection to confirm it works."
+  },
+  {
+   "fieldname": "ai_setup_token",
+   "fieldtype": "Password",
+   "label": "Setup Token (auto-generated, do not share)",
+   "read_only": 1,
+   "hidden": 1
+  },
+  {
+   "fieldname": "ai_cf_access_section",
+   "fieldtype": "Section Break",
+   "label": "Secure Remote Access (Named Tunnel + Cloudflare Access)",
+   "collapsible": 1,
+   "description": "Optional, for production use once the quick tunnel above has proven the setup works. A quick tunnel (*.trycloudflare.com) is a plain, unauthenticated public URL that changes every restart — fine to get started, not something to leave running long-term. A named Cloudflare Tunnel keeps a fixed address, and putting it behind Cloudflare Access with a Service Token means Cloudflare rejects every request at its edge — before it ever reaches your machine — unless it carries the two secret headers below. No one browsing to the tunnel URL directly can reach your AI server; only this CRM, using these credentials, can."
+  },
+  {
+   "fieldname": "ai_cf_access_help",
+   "fieldtype": "HTML",
+   "options": "<div class='text-muted small'><b>One-time setup, on the machine running Ollama and in the Cloudflare dashboard:</b><ol style='padding-left:18px;margin-bottom:0;'><li>Add a domain to Cloudflare (free plan is fine) if you haven't already.</li><li><code>cloudflared tunnel login</code>, then <code>cloudflared tunnel create alphax-ollama</code>.</li><li><code>cloudflared tunnel route dns alphax-ollama ai.yourdomain.com</code>.</li><li>Point the tunnel's config at <code>http://localhost:11434</code> and run it as a service (<code>cloudflared service install</code>) so it survives reboots.</li><li>In the Cloudflare Zero Trust dashboard: Access &rarr; Applications &rarr; add <code>ai.yourdomain.com</code>, with a policy requiring <b>Service Auth</b> (not a login page — this CRM is a server calling another server, not a person in a browser).</li><li>Access &rarr; Service Auth &rarr; Service Tokens &rarr; create one. Copy its Client ID and Client Secret into the two fields below.</li><li>Set <b>AI Base URL</b> above to <code>https://ai.yourdomain.com</code>, save this form, then use <b>Test AI Connection</b>.</li></ol></div>"
+  },
+  {
+   "fieldname": "ai_cf_access_client_id",
+   "fieldtype": "Data",
+   "label": "CF-Access-Client-Id"
+  },
+  {
+   "fieldname": "ai_cf_access_client_secret",
+   "fieldtype": "Password",
+   "label": "CF-Access-Client-Secret"
+  },
+  {
+   "fieldname": "sales_analytics_section",
+   "fieldtype": "Section Break",
+   "label": "Sales Analytics (Reports & Dashboard)"
+  },
+  {
+   "fieldname": "won_status",
+   "fieldtype": "Data",
+   "label": "Opportunity \"Won\" Status Value",
+   "default": "Converted",
+   "description": "Must match one of the options on Opportunity's own Status field exactly (case-sensitive) \u2014 used by the Win/Loss report, Sales Leaderboard, and the AI Assistant's conversion-funnel question to know which status means a deal was won."
+  },
+  {
+   "fieldname": "lost_status",
+   "fieldtype": "Data",
+   "label": "Opportunity \"Lost\" Status Value",
+   "default": "Lost",
+   "description": "Must match one of the options on Opportunity's own Status field exactly (case-sensitive)."
+  },
+  {
+   "fieldname": "sa_analytics_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dashboard_default_range_days",
+   "fieldtype": "Int",
+   "label": "Dashboard Default Date Range (days)",
+   "default": 30,
+   "description": "How far back the Executive Dashboard looks by default when opened with no date filter set."
+  },
+  {
+   "fieldname": "pdpl_section",
+   "fieldtype": "Section Break",
+   "label": "PDPL Retention"
+  },
+  {
+   "fieldname": "pdpl_retention_enabled",
+   "fieldtype": "Check",
+   "label": "Enable Retention Policy",
+   "default": "0"
+  },
+  {
+   "fieldname": "pdpl_retention_days",
+   "fieldtype": "Int",
+   "label": "Retain Unconverted Leads For (days)",
+   "default": "365"
+  },
+  {
+   "fieldname": "pdpl_retention_action",
+   "fieldtype": "Select",
+   "label": "Retention Action",
+   "options": "Anonymize\nDelete",
+   "default": "Anonymize"
+  },
+  {
+   "fieldname": "retention_batch_size",
+   "fieldtype": "Int",
+   "label": "Retention Batch Size",
+   "default": "100"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-01-01 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AlphaX CRM",
+ "name": "AlphaX CRM Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Sales Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
