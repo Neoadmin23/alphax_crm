@@ -1,0 +1,74 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-09-30 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "stage",
+  "days",
+  "notify",
+  "require_no_activity",
+  "label"
+ ],
+ "fields": [
+  {
+   "columns": 3,
+   "description": "Lead Stage (native Status) this milestone applies to.",
+   "fieldname": "stage",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Stage",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "description": "Days after the Lead most recently entered this stage (or its creation date, if it started there and never transitioned in).",
+   "fieldname": "days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Days In Stage",
+   "reqd": 1
+  },
+  {
+   "columns": 3,
+   "fieldname": "notify",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Notify",
+   "options": "Lead Owner\nApprover (Sales Manager)\nBoth",
+   "reqd": 1,
+   "default": "Lead Owner"
+  },
+  {
+   "columns": 2,
+   "default": "1",
+   "description": "Only fire if nothing has happened on the Lead since it entered this stage (no communication, comment, or status change). Turn off for an unconditional calendar check-in.",
+   "fieldname": "require_no_activity",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Only If No Activity"
+  },
+  {
+   "columns": 4,
+   "description": "Shown in the notification subject/timeline comment, e.g. \"First contact reminder\", \"Escalation — quotation overdue\".",
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Label"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-30 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AlphaX CRM",
+ "name": "AlphaX Lead Stage SLA",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "ASC",
+ "states": []
+}
