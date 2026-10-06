@@ -3,6 +3,44 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.32.0] — 2026-10-06
+### Fixed — Lead Stage snapping back to "Quotation", and editable fields losing data on review
+Two independent bugs reported by staff, both in how a Lead's fields get
+silently rewritten on save, not on anything a user does wrong.
+
+**Lead Stage reverting on any save that isn't a full form save**
+`crm/lead.py`'s `_sync_stage_from_status()` (Lead Status -> Lead Stage
+automation) only meant to act when Lead Status itself changed, guarded by
+comparing against `doc.get_doc_before_save()`. That's only populated on a
+full form load-then-save — a quick edit from the list view (the Lead Stage
+dropdown shown directly in the list), a Kanban drag, or a bulk "Edit" never
+populates it, so the guard read Lead Status as "just changed" on every such
+save and re-ran the mapping, overwriting whatever Lead Stage had just been
+picked by hand (snapping it back to "Quotation" for any lead whose Lead
+Status is "Prospect" — the shipped default mapping — no matter which stage
+was actually chosen).
+- Fix: read the previous Lead Status with a direct `frappe.db.get_value()`
+  instead, which is reliable across every save path, not just the form.
+
+**Editable fields silently reverting to the linked Prospect's data**
+`first_name`, `lead_owner`, `custom_prelead_job_title`, `company_name`,
+`city` and `custom_lead_city` on Lead are `fetch_from` fields pulling from
+the linked AlphaX Prospect / Lead City record, with `fetch_if_empty` left
+off (Frappe's default). That setting re-fetches and overwrites the field
+from its source on *every* save of the Lead, even one a staff member has
+since edited directly — so the next save by anyone, commonly an approver
+opening the record to review it, silently wipes the edit. No error, no
+trace — exactly the "data disappears when the approver reviews it"
+behavior staff reported.
+- Fix: new `crm/utils.ensure_fetch_if_empty()`, applied to all six fields
+  via `setup/install.fix_fetch_overwrite_fields()` (run from both
+  after_install and after_migrate, self-healing like
+  `ensure_select_option`/`sync_lead_stage_options`). Each field still
+  auto-fills while blank; it no longer overwrites a value someone has
+  since typed in by hand. `business_division` (fetch_from `business_line`)
+  is deliberately left alone — it's read-only, so always mirroring its
+  source there is correct, not a bug.
+
 ## [0.31.0] — 2026-10-01
 ### Fixed — WF-06 closure controls duplicated fields already on the Lead form
 0.30.0's "Closure Controls (WF-06)" section added four new custom fields

@@ -10,6 +10,7 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 def after_install():
     setup_custom_fields()
+    fix_fetch_overwrite_fields()
     setup_accounting_dimensions()
     seed_default_settings()
     ensure_whatsapp_defaults()
@@ -35,6 +36,7 @@ def after_migrate():
     # Keep config self-healing on every deploy.
     retire_duplicate_closure_fields()
     setup_custom_fields()
+    fix_fetch_overwrite_fields()
     setup_accounting_dimensions()
     ensure_whatsapp_defaults()
     ensure_dq_rules()
@@ -147,6 +149,42 @@ def _get_or_create_lost_reason(label):
         return doc.name
     except Exception:
         return None
+
+
+def fix_fetch_overwrite_fields():
+    """Data-loss guard: several editable Lead fields are fetch_from fields
+    pulling from the linked AlphaX Prospect (or Lead City) record, with
+    fetch_if_empty left off — Frappe's default. That means each one is
+    silently re-fetched and overwritten from its source on every save of
+    the Lead, even when a staff member has since typed something different
+    into it directly. The next save by anyone — commonly an approver
+    opening the record to review it — wipes that edit with no error and no
+    trace, which is exactly the "data disappears" behavior staff have been
+    reporting. Turns fetch_if_empty on for each (self-healing on migrate,
+    same pattern as ensure_select_option/sync_lead_stage_options): the
+    field still auto-fills while blank, it just stops clobbering a value
+    someone has since edited by hand.
+
+    Deliberately excludes business_division (fetch_from business_line),
+    which is read_only — nobody edits it directly, so always mirroring the
+    source there is correct, not a bug.
+    """
+    from alphax_crm.crm.utils import ensure_fetch_if_empty
+
+    targets = [
+        ("Lead", "first_name"),
+        ("Lead", "lead_owner"),
+        ("Lead", "custom_prelead_job_title"),
+        ("Lead", "company_name"),
+        ("Lead", "city"),
+        ("Lead", "custom_lead_city"),
+    ]
+    changed = False
+    for doctype, fieldname in targets:
+        if frappe.db.exists("DocType", doctype) and ensure_fetch_if_empty(doctype, fieldname):
+            changed = True
+    if changed:
+        frappe.clear_cache(doctype="Lead")
 
 
 def _default_stage_transitions():

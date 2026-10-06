@@ -132,9 +132,19 @@ def _sync_stage_from_status(doc, settings):
     if not lead_status:
         return
 
-    before = doc.get_doc_before_save() if not doc.is_new() else None
-    previous_status = before.get(_STAGE_STATUS_FIELD) if before else None
-    if before and previous_status == lead_status:
+    # Read the committed value straight from the DB rather than relying on
+    # get_doc_before_save(), which is only populated on a full form
+    # load-then-save. A quick edit from the list view, a Kanban drag, or a
+    # bulk "Edit" updates the document without ever populating it, so
+    # previous_status read back as None and this function treated EVERY
+    # such save as "Lead Status just changed" — re-running the Lead
+    # Status -> Lead Stage mapping and silently overwriting whatever Lead
+    # Stage had just been picked by hand (e.g. snapping it back to
+    # "Quotation" for any lead whose Lead Status is "Prospect", regardless
+    # of which stage was actually chosen). A direct DB read is reliable
+    # across every save path, not just the form.
+    previous_status = None if doc.is_new() else frappe.db.get_value(doc.doctype, doc.name, _STAGE_STATUS_FIELD)
+    if previous_status == lead_status:
         return  # Lead Status did not change on this save; leave Lead Stage alone.
 
     mapped_stage = _lead_stage_for(lead_status, settings)

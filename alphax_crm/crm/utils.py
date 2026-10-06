@@ -120,6 +120,49 @@ def ensure_select_option(doctype, fieldname, value, clear_cache=True):
     return True
 
 
+def ensure_fetch_if_empty(doctype, fieldname):
+    """Turn on "Fetch If Empty" (via Property Setter) for an editable
+    fetch_from field that doesn't already have it on.
+
+    Frappe's default for a fetch_from field is fetch_if_empty=0, which
+    means the field is re-fetched from its link source and OVERWRITTEN on
+    every save of the parent document — even if a user has since edited it
+    directly. That's correct for a read-only mirror field, but for an
+    *editable* one it silently destroys a manual edit the next time anyone
+    saves the record, with no error and no trace of what happened — it just
+    looks like the data vanished. Flipping fetch_if_empty on keeps the
+    auto-fill-when-blank behavior without ever clobbering a value someone
+    has since typed in by hand.
+
+    No-ops if the field isn't a fetch_from field, doesn't exist, or already
+    has fetch_if_empty on. Returns True if a Property Setter was created or
+    changed.
+    """
+    meta = frappe.get_meta(doctype)
+    field = meta.get_field(fieldname)
+    if not field or not field.fetch_from or field.fetch_if_empty:
+        return False
+
+    ps_name = frappe.db.get_value(
+        "Property Setter",
+        {"doc_type": doctype, "field_name": fieldname, "property": "fetch_if_empty"},
+        "name",
+    )
+    if ps_name:
+        frappe.db.set_value("Property Setter", ps_name, "value", "1")
+    else:
+        frappe.get_doc({
+            "doctype": "Property Setter",
+            "doctype_or_field": "DocField",
+            "doc_type": doctype,
+            "field_name": fieldname,
+            "property": "fetch_if_empty",
+            "property_type": "Check",
+            "value": "1",
+        }).insert(ignore_permissions=True)
+    return True
+
+
 def active_lead_workflow_field():
     """The workflow_state_field of whichever Workflow is currently active
     for Lead, or None if there isn't one. Cached per-request via
