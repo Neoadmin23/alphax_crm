@@ -247,6 +247,8 @@ def ensure_closure_defaults():
         "lost_stage_values": "Lost with reason,Lost Quotation",
         "contract_signed_value": "Signed",
         "require_customer_for_won": 1,
+        "lost_quotation_stage_value": "Lost Quotation",
+        "guard_quotation_lead_stage": 1,
     }
     changed = False
     for f, v in defaults.items():

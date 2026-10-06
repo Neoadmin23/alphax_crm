@@ -54,6 +54,7 @@
   "postponed_stage_value",
   "postponed_default_revisit_days",
   "lost_quotation_stage_value",
+  "guard_quotation_lead_stage",
   "lost_quotation_digest_enabled",
   "stage_sla_section",
   "stage_sla_enabled",
@@ -437,6 +438,13 @@
    "fieldtype": "Data",
    "label": "\"Lost Quotation\" Lead Stage Value",
    "default": "Lost Quotation"
+  },
+  {
+   "fieldname": "guard_quotation_lead_stage",
+   "fieldtype": "Check",
+   "label": "Guard Lead Stage Against Quotation Status Sync",
+   "default": "1",
+   "description": "ERPNext core resets a Lead's status to \"Quotation\" every time its linked Quotation is submitted, cancelled, or declared Lost (via Quotation's own \"Set as Lost\") — core has no concept of this app's Lost Quotation/Lost with reason/Won stages, so it silently overwrites whichever one was just set. When this is on, AlphaX CRM corrects the Lead's Lead Stage back to the \"Lost Quotation\" value above immediately after a linked Quotation turns Lost or is cancelled."
   },
   {
    "fieldname": "lost_quotation_digest_enabled",

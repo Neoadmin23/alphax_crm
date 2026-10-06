@@ -4,7 +4,7 @@ app_publisher = "Neotec Integrated Solutions"
 app_description = "Compliance-grade CRM automation for AlphaX on Frappe/ERPNext."
 app_email = "support@neotec.ai"
 app_license = "Proprietary"
-app_version = "0.32.0"
+app_version = "0.33.1"
 
 # Requires ERPNext (Lead / Opportunity / CRM doctypes)
 required_apps = ["erpnext"]
@@ -68,7 +68,10 @@ doc_events = {
         "on_update": "alphax_crm.crm.prelead.on_update",
     },
     "Quotation": {
-        "on_submit": "alphax_crm.crm.quotation.on_submit",
+        "on_submit": ["alphax_crm.crm.quotation.on_submit", "alphax_crm.crm.quotation.guard_lead_stage"],
+        "on_cancel": "alphax_crm.crm.quotation.guard_lead_stage",
+        "on_update": "alphax_crm.crm.quotation.guard_lead_stage",
+        "on_update_after_submit": "alphax_crm.crm.quotation.guard_lead_stage",
     },
 }
 

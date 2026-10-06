@@ -3,6 +3,58 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.33.1] — 2026-10-06
+### Added — one-off repair for Leads already stuck on "Quotation"
+Not a new bug: `guard_quotation_lead_stage` (added in 0.33.0) was confirmed
+switched **off** in a live site's AlphaX CRM Settings export, so the guard
+had never actually run there. Even once it's switched back on, the guard
+only fires the next time something touches a Lead's linked Quotation — a
+Lead whose Quotation already went Lost/cancelled before the toggle was on
+stays stuck on "Quotation" until someone reopens that Quotation.
+
+- New whitelisted `crm/quotation.backfill_lead_stage_for_lost_quotations()`:
+  scans every Lost or cancelled Quotation against a Lead, and for any whose
+  Lead is still sitting on "Quotation", re-runs the same correction used by
+  the live guard. Idempotent, System-Manager-only, runnable once via
+  `bench --site <site> execute alphax_crm.crm.quotation.backfill_lead_stage_for_lost_quotations`.
+  Runs regardless of the guard_quotation_lead_stage toggle — a deliberate
+  one-off repair, not the automatic guard.
+
+## [0.33.0] — 2026-10-06
+### Fixed — Lead Stage snapping back to "Quotation" after a deal is lost
+Root cause confirmed to be core ERPNext, not this app: `Quotation.update_lead()`
+— called from core's own `on_submit()`, `on_cancel()`, and
+`declare_enquiry_lost()` ("Set as Lost") — always ends with
+`frappe.get_doc("Lead", self.party_name).set_status(update=True)`. That core
+method has no concept of this app's custom Lead Stage values (Lost
+Quotation / Lost with reason / Won / Postponed / Contract Under Signing /
+Qualified lead); it only knows "a Quotation exists against this Lead", so it
+unconditionally forces Lead Stage back to the generic "Quotation" value —
+even a Quotation that was just submitted as Lost or cancelled. This is a
+long-standing core limitation (frappe/erpnext#4956), and it happens via a
+direct `db_set()` on the Lead that bypasses this app's own Lead `validate()`
+hooks (and therefore `stage_flow.py`) entirely, so nothing already in this
+app could have caught it — confirmed reproducing with `auto_set_stage_from_status`,
+`stage_flow_enabled`, and `closure_controls_enabled` all turned OFF.
+
+- New `crm/quotation.guard_lead_stage()`, hooked onto Quotation's
+  `on_submit`, `on_cancel`, `on_update` and `on_update_after_submit` (every
+  point core calls `update_lead()` from, including the plain `self.save()`
+  inside `declare_enquiry_lost()`). Fires only once the deal is actually
+  off (`Quotation.status == "Lost"` or cancelled) and the linked Lead's
+  stage was just reset to the generic "Quotation" value; corrects it to the
+  configured "Lost Quotation" stage, stamps Won/Lost Date if blank, and
+  leaves a comment on the Lead explaining the correction for audit. Leaves
+  any other Lead Stage value alone — it only undoes this specific core
+  behavior, never a deliberate manual choice.
+- New **AlphaX CRM Settings** toggle `guard_quotation_lead_stage` (default
+  on), in Closure Controls (WF-06), with a description naming the exact
+  core behavior being guarded against. Defaulted on for existing sites via
+  `ensure_closure_defaults()`.
+- Does not touch a normal Quotation submission that's progressing the deal
+  forward — "Quotation" is the correct Lead Stage for that case, and core
+  setting it is working as intended there.
+
 ## [0.32.0] — 2026-10-06
 ### Fixed — Lead Stage snapping back to "Quotation", and editable fields losing data on review
 Two independent bugs reported by staff, both in how a Lead's fields get
