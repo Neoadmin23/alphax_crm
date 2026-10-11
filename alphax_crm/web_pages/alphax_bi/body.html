@@ -1,0 +1,84 @@
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<div class="axw" id="axw-root" data-theme="light">
+  <header class="axw-hero">
+    <div>
+      <h1>AlphaX BI Dashboard</h1>
+      <p>One screen for all AlphaX BI reports. Set the filters once and every tab updates together.</p>
+    </div>
+    <div class="axw-hero-right">
+      <span id="axw-updated">Loading…</span>
+      <button class="axw-btn" id="axw-refresh">Refresh</button>
+      <button class="axw-btn" id="axw-fx-toggle">Graphical effects</button>
+    </div>
+  </header>
+
+  <section class="axw-card axw-filters">
+    <label>From<input type="date" id="axw-from"></label>
+    <label>To<input type="date" id="axw-to"></label>
+    <label>Business Unit<select id="axw-bu"></select></label>
+    <label>Sub Service<select id="axw-ss"></select></label>
+    <label>Sales Person<select id="axw-owner"></select></label>
+    <label>Source<select id="axw-source"></select></label>
+    <label>Country<select id="axw-country"></select></label>
+    <label>City<select id="axw-city"></select></label>
+    <button class="axw-btn axw-btn-ghost" id="axw-clear">Clear</button>
+  </section>
+
+  <section class="axw-card axw-fx" id="axw-fx" hidden>
+    <div class="axw-fx-title">Graphical effects <small>(saved in this browser)</small></div>
+    <div class="axw-fx-grid">
+      <label>Chart type
+        <select id="fx-type">
+          <option value="auto">As designed</option>
+          <option value="bar">Bar</option>
+          <option value="line">Line</option>
+          <option value="pie">Pie</option>
+          <option value="doughnut">Doughnut</option>
+          <option value="polarArea">Polar area</option>
+          <option value="radar">Radar</option>
+        </select></label>
+      <label>Colour theme
+        <select id="fx-theme">
+          <option value="corporate">Corporate blue</option>
+          <option value="sunset">Sunset</option>
+          <option value="forest">Forest</option>
+          <option value="neon">Neon</option>
+          <option value="mono">Monochrome</option>
+          <option value="rainbow">Rainbow</option>
+        </select></label>
+      <label>Style
+        <select id="fx-style">
+          <option value="flat">Flat</option>
+          <option value="gradient">Gradient</option>
+          <option value="glow">3D / shadow</option>
+        </select></label>
+      <label>Animation
+        <select id="fx-anim">
+          <option value="smooth">Smooth</option>
+          <option value="fast">Fast</option>
+          <option value="slow">Slow &amp; bouncy</option>
+          <option value="off">Off</option>
+        </select></label>
+      <label>Legend
+        <select id="fx-legend">
+          <option value="bottom">Bottom</option>
+          <option value="top">Top</option>
+          <option value="right">Right</option>
+          <option value="none">Hidden</option>
+        </select></label>
+      <label>Page mode
+        <select id="fx-mode">
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select></label>
+      <label class="axw-check"><input type="checkbox" id="fx-labels"> Value labels</label>
+      <label class="axw-check"><input type="checkbox" id="fx-grid" checked> Grid lines</label>
+      <label class="axw-check"><input type="checkbox" id="fx-round" checked> Rounded bars</label>
+      <button class="axw-btn axw-btn-ghost" id="fx-reset">Reset</button>
+    </div>
+  </section>
+
+  <nav class="axw-tabs" id="axw-tabs"></nav>
+  <div class="axw-msg" id="axw-msg"></div>
+  <div id="axw-panes"></div>
+</div>
