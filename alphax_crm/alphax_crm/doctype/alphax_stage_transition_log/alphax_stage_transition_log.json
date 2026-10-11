@@ -1,0 +1,126 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-09-20 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "reference_doctype",
+  "reference_name",
+  "column_break_ref",
+  "field_label",
+  "from_value",
+  "to_value",
+  "section_break_time",
+  "changed_by",
+  "changed_on",
+  "days_since_previous"
+ ],
+ "fields": [
+  {
+   "fieldname": "reference_doctype",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Record Type",
+   "options": "Lead\nAlphaX PreLead\nOpportunity",
+   "reqd": 1
+  },
+  {
+   "fieldname": "reference_name",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Record",
+   "options": "reference_doctype",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ref",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "field_label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Tracked Field"
+  },
+  {
+   "fieldname": "from_value",
+   "fieldtype": "Data",
+   "label": "From"
+  },
+  {
+   "fieldname": "to_value",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "To"
+  },
+  {
+   "fieldname": "section_break_time",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "changed_by",
+   "fieldtype": "Link",
+   "label": "Changed By",
+   "options": "User"
+  },
+  {
+   "fieldname": "changed_on",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Changed On"
+  },
+  {
+   "description": "Days elapsed since this record's previous change of the same tracked field (the “day gap between actions”).",
+   "fieldname": "days_since_previous",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Days Since Previous",
+   "precision": "2"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-09-20 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AlphaX CRM",
+ "name": "AlphaX Stage Transition Log",
+ "naming_rule": "Expression (old style)",
+ "autoname": "hash",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "changed_on",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}
