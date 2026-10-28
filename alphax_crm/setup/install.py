@@ -33,8 +33,10 @@ def after_install():
 
 
 def after_migrate():
+    ensure_bi_web_page()
     # Keep config self-healing on every deploy.
     retire_duplicate_closure_fields()
+    cleanup_renamed_bi_reports()
     setup_custom_fields()
     fix_fetch_overwrite_fields()
     setup_accounting_dimensions()
@@ -55,6 +57,76 @@ def after_migrate():
     setup_notifications()
     setup_lead_approval_workflow()
     frappe.db.commit()
+
+
+def ensure_bi_web_page():
+    """Create/refresh the public-website version of the BI dashboard at
+    /alphax-bi (a Frappe "Web Page" record) from the files in
+    alphax_crm/web_pages/alphax_bi. Safe on every migrate: it only rewrites
+    the page's own body/JS/CSS, and never breaks a migrate if it can't."""
+    import os
+
+    try:
+        base = os.path.join(os.path.dirname(os.path.dirname(__file__)), "web_pages", "alphax_bi")
+
+        def read(name):
+            with open(os.path.join(base, name), encoding="utf-8") as fh:
+                return fh.read()
+
+        values = {
+            "title": "AlphaX BI Dashboard",
+            "route": "alphax-bi",
+            "published": 1,
+            "content_type": "HTML",
+            "main_section_html": read("body.html"),
+            "javascript": read("page.js"),
+            "css": read("page.css"),
+            "insert_style": 1,
+            "full_width": 1,
+            "show_title": 0,
+            "show_sidebar": 0,
+            "enable_comments": 0,
+        }
+        name = frappe.db.get_value("Web Page", {"route": "alphax-bi"})
+        if name:
+            doc = frappe.get_doc("Web Page", name)
+            doc.update(values)
+            doc.save(ignore_permissions=True)
+        else:
+            frappe.get_doc({"doctype": "Web Page", **values}).insert(ignore_permissions=True)
+    except Exception:
+        frappe.log_error(title="AlphaX: could not create /alphax-bi web page")
+
+
+def cleanup_renamed_bi_reports():
+    """One-time cleanup for sites that already ran 0.34.0's install.
+
+    That version shipped the 4 new "AlphaX ... (BI)" reports with a literal
+    "(BI)" suffix in report_name. Frappe builds a script report's Python
+    module path from report_name via frappe.scrub() (lowercase, spaces/
+    hyphens -> underscores) but does NOT strip other punctuation, so
+    "(BI)" carried straight through into an unimportable module name
+    (".., _(bi)") -- every one of them threw ModuleNotFoundError the
+    instant anyone opened it. 0.34.1 renamed all 4 to drop the
+    parentheses, but Frappe's standard-report sync keys off name, so the
+    old "(BI)" Report records were never touched by that rename -- they
+    just sit in the Report list, orphaned, throwing the same error
+    forever, since the module they point at no longer exists under that
+    name. Deletes them by name if present; idempotent, and a no-op on a
+    site that installed 0.34.1 (or later) fresh.
+    """
+    old_names = [
+        "AlphaX Lead Stage Tracker (BI)",
+        "AlphaX Pipeline Aging (BI)",
+        "AlphaX Lost Reason Breakdown (BI)",
+        "AlphaX Quotation Value by Business Unit (BI)",
+    ]
+    for name in old_names:
+        if frappe.db.exists("Report", name):
+            try:
+                frappe.delete_doc("Report", name, force=True, ignore_permissions=True, ignore_missing=True)
+            except Exception:
+                frappe.log_error(title="AlphaX CRM: cleanup renamed BI report", message=frappe.get_traceback())
 
 
 def retire_duplicate_closure_fields():

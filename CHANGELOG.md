@@ -3,6 +3,327 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.39.0] — 2026-10-11
+### Added — "Lead performance" screen built from the design mockup (first tab of /alphax-bi)
+One period-driven report replacing the separate Daily / Weekly / Monthly summaries:
+period pills (Daily, Weekly, Monthly, Quarterly, Half-yearly) + **Report through** date; KPI cards (New leads
+with YoY, Total stage entries, Won / Lost with win rate, Quotation value with average); **Stage entries**
+(distinct leads per destination stage); **same-period comparison with the previous 3 years** (same
+calendar period and elapsed days; weekly uses the same Sunday-based week number); **Combined summary**
+table with YoY and "No data" for years with no history; **current open pipeline** by stage; **stage aging**
+(avg / max days since the latest stage entry); **quotation value by payment type** (Payment Terms Template);
+**lost reasons**. Every existing filter applies (Sales Person, Source, City, Country, Business Unit,
+Sub Service) plus new **Status** and **Current stage**.
+Extras beyond the mockup: Lead-to-Won cohort funnel with step conversion, auto-written Key insights,
+click-through drill-down to the contributing leads (opens the Lead), summary CSV export with the
+selected filters and windows, Print, animated bars, light/dark mode.
+New API: `alphax_crm.api.lead_performance` (get_lead_performance, get_lead_drill, get_lead_options).
+
+## [0.38.0] — 2026-10-11
+### Added — website version of the dashboard (/alphax-bi), Sub Service cascades from Business Unit
+**1. Website dashboard at `/alphax-bi`** (a Frappe Web Page, created/refreshed automatically on migrate).
+Tabs for each of the 7 reports plus the Pivot Explorer, a shared filter bar (dates, Business Unit,
+Sub Service, Sales Person, Source, Country, City), and a **Graphical effects** panel: chart type
+(bar/line/pie/doughnut/polar/radar), colour theme, flat/gradient/3D-shadow style, animation speed,
+legend position, value labels, grid lines, rounded bars, light/dark page. Choices are remembered in the
+browser. Needs a logged-in Sales User / Sales Manager / System Manager (it reads the same secured API).
+
+**2. Sub Service now depends on Business Unit in every report filter**, exactly like the Lead form's
+"lead sub clases" script: choosing a Business Unit reloads the Sub Service list for that unit and
+clears the old pick.
+
+**3. Business Unit / Sub Service now also read the "Lead Business Unit" child rows** on the Lead form
+(a lead matches if its own field OR any child row has the value; with both filters, one row must
+match both), and fill blanks in grouping/pivot from the first child row.
+
+## [0.37.0] — 2026-10-11
+### Added — Sub Service filter and a Pivot Explorer (Power BI-style) tab
+**1. Sub Service filter (`custom_sub_service`)** on all 7 BI reports and the dashboard. The list
+follows the Lead form's own rules: on the dashboard it narrows to the chosen Business Unit; it also
+includes any values already in use.
+
+**2. "Pivot Explorer" tab on the AlphaX BI Dashboard.** Pick Rows, Columns (optional), Measure
+(Leads / Won / Lost / Win Rate %) and Chart type (bar, line, pie, donut, percentage); it draws the
+chart plus a heat-shaded pivot table with totals, follows the shared filter bar, and has a
+"Download CSV" button. Dimensions: Sales Person, Source, City, Country, Business Unit, Sub Service,
+Lead Stage, Lead Status, Company Type, Industry, Created Month/Year (only those that exist on the site).
+
+**3. Dashboard banner wording** changed to plain language ("One screen for all AlphaX BI reports.
+Set the filters once and every tab updates together.").
+
+## [0.36.1] — 2026-10-11
+### Fixed — dashboard stuck on "Loading…", and Business Unit now uses the real field
+**1. Dashboard showed only "Loading…" and no data.** My "Last updated" timestamp line used a
+string helper Frappe doesn't have, which threw a JS error before any KPI/chart/table was drawn.
+Replaced with plain text concatenation.
+
+**2. Business Unit filter now uses `custom_business_line_` ("Service Need").** The earlier
+`custom_business_lead_unit` is a *child-table* field (rows of "Lead Business Unit") -- it has no
+column on tabLead, which is why it kept raising "Unknown column". Every BI report, the dashboard
+and the API now filter/group on the real Lead column `custom_business_line_`; the dropdown lists
+its declared options plus any values in use.
+
+## [0.36.0] — 2026-10-11
+### Added — "grand presentation" dashboard upgrade, real-value filters, and the Lead Tracker XLSX rebuild
+**1. AlphaX BI Dashboard (Desk Page) redesign.** Each of the 7 report tabs now
+carries its own accent color, cascading from the tab dot through its KPI
+cards and chart/detail cards (via CSS custom properties), so each report
+reads as one coordinated block instead of an undifferentiated row of blue
+tiles. Added a gradient hero banner at the top of the page with a
+"Last updated" timestamp that refreshes on every reload, refined card/table
+styling (hover states, rounded accent borders), and fixed switching tabs to
+correctly restore that tab's own status message.
+
+**2. Country filter — real Link field.** Added to all 7 report `.js` files
+and the Dashboard, as a proper searchable "Country" Link field (Frappe's
+built-in Country doctype), alongside the existing Lead dimension filters.
+
+**3. Business Unit filter — dropdown of real values in use.** "Business
+Unit" (`custom_business_lead_unit`) has no master doctype to link against
+(it's a plain field, not backed by a standalone list), so instead of a
+free-text guess it's now a Select populated at load time from
+`get_business_unit_options()` — a new whitelisted method returning the
+distinct, non-blank values already on this site's Leads. Wired into all 7
+reports (via each report's `onload`) and the Dashboard (via
+`page.fields_dict`).
+
+**4. Lead Tracker BI Report workbook, rebuilt.** The standalone
+`Lead_Tracker_BI_Report.xlsx` reference workbook (delivered earlier in this
+engagement) has been refreshed: Business Unit (renamed from "Business
+Line" to match the live CRM field) and a new Country dimension are now
+real filters on the Report tab, each with its own current-period breakdown
+table and chart (sections 10 and 11), and every other filter (Sales
+Person, Source, City, Status) now also narrows those two breakdowns, for
+consistency with the rest of the report. All 3,149 formulas recalculate
+clean (0 errors). This is a standalone sample/demo workbook with synthetic
+data (not a live export) — see its "How To Use" tab.
+
+## [0.35.1] — 2026-10-08
+### Fixed — 0.35.0 broke on a real run; 3 issues from your screenshots/reports
+**1. "Unknown column 'custom_business_lead_unit'" again, on 4 reports
+(Lead Stage Tracker, Quotation Value by Business Unit, Sales Person
+Performance, Source Performance).** This is a *different* bug than the one
+0.34.2 fixed, even though the error message is identical. The earlier fix
+checked `meta.has_field()` -- whether the field is *declared* (DocType
+JSON or a Custom Field record) -- and assumed that meant the actual MySQL
+column exists. On this site it doesn't: there's a Custom Field record for
+"custom_business_lead_unit" (so `has_field()` says yes), but the database
+migration that was supposed to add the real column to `tabLead` never
+completed (most likely blocked by the "AlphaX Business Unit" DocType issue
+below, which can abort a migrate partway through) -- so the column itself
+was still missing, and every query touching it crashed exactly as before.
+`business_unit_field()` in `crm/bi_report.py` now also checks the live
+table's actual columns (`frappe.db.get_table_columns("Lead")`), not just
+the declared metadata, before trusting the field is usable. If the field
+is genuinely missing, every report falls back the same way 0.34.2 already
+set up (filter ignored / "(not set)" grouping) -- now it also falls back
+correctly when the field is declared but the column itself isn't there.
+
+**2. "AlphaX Business Unit is not a valid parent DocType for AlphaX
+Business Unit" / "No permission for AlphaX Business Unit" / "Not
+permitted".** These three were all one mistake on my part: every new BI
+report's "Business Unit" filter was set up as a Link field pointing at
+"AlphaX Business Unit" -- but that DocType is a **child table**
+(`istable: 1`, used only as rows inside AlphaX Smart Lead's own
+"Business Units" table, with no permissions of its own), not a
+standalone, listable master. A Link field has to search/list its target
+doctype as you type, and Frappe refuses to do that for a child-table
+doctype queried on its own -- which is exactly where all three of those
+messages come from. There was never going to be a working dropdown here:
+a Lead's Business Unit isn't a single linkable record on this site's data
+model, it's a table of them (possibly several per Smart Lead). Changed
+the "Business Unit" filter on all 7 BI reports and the BI Dashboard from
+a Link to a plain text field that matches whatever value is actually
+stored in `custom_business_lead_unit` -- no more querying that DocType at
+all from the filter bar.
+
+**3. "The image should be from date and to date with 1 month back from
+today's date default."** Fair -- "Period Type" + "As Of Date" needs
+picking an *as-of* day and then a bucket size, which isn't obvious, and a
+report opened cold could land on "Daily" (today only) and look broken
+(all zeros). Added explicit **From Date** / **To Date** filters to all 6
+period-based BI reports and the BI Dashboard, defaulting to one month
+back through today, so opening any of them cold now shows real data
+immediately. When both are filled in, they're used exactly as given
+(no snapping to week/month/quarter boundaries); clear either one and the
+report falls back to the original Period Type + As Of Date behavior, so
+nothing that already relied on that is broken. (AlphaX Pipeline Aging BI
+is unaffected -- it only ever reads a single "as of" date, by design.)
+
+## [0.35.0] — 2026-10-08
+### Added — Pipeline Aging date selection, 3 new BI reports, and a master BI Dashboard
+**1. AlphaX Pipeline Aging BI now has an "As Of Date" filter.** Previously
+it only ever showed the pipeline as it stood right now; it can now
+reconstruct how the pipeline looked on any past date, by replaying each
+Lead's full "Lead Stage" transition history from AlphaX Stage Transition
+Log up to that date (taking the latest transition at or before it, per
+Lead) rather than just reading today's live `status`. A Lead created after
+the As Of Date is excluded outright. A Lead that existed by then but has no
+logged transition at or before it (created before this app started
+tracking transitions, or never touched since) is assumed to have still
+been on "Lead" (the default stage for a new Lead) — the report says so
+explicitly, and surfaces how many leads relied on that assumption as its
+own report-summary card, so it's never silently guessing.
+
+**2. Three new BI reports**, same period/compare engine and filter bar as
+the existing 4 (`crm/bi_report.py`):
+- **AlphaX Stage Conversion BI** — how many Leads moved into vs. back out
+  of each stage during the selected period ("Entered" / "Exited" / "Exit
+  Rate %"), read straight off AlphaX Stage Transition Log's own
+  `from_value`/`to_value` columns. Exit Rate is explicitly labeled a
+  period-aligned activity ratio, not a same-cohort lifetime conversion
+  rate (a Lead that entered near the end of the period hasn't had time to
+  exit yet) — the report says so in its own message rather than
+  overclaiming. Also reports top-line "Lead-to-Won %" / "Lead-to-Lost %".
+- **AlphaX Sales Person Performance BI** — New Leads / Won / Lost /
+  Quotation Value / Win Rate, one row per Sales Person, for the period.
+- **AlphaX Source Performance BI** — the same breakdown, one row per Lead
+  Source, plus a Conversion % column.
+Both performance reports share a new `bi_report.grouped_performance()`
+helper rather than duplicating the per-dimension tally logic twice.
+
+**3. A new "AlphaX BI Dashboard" page** (Desk page, under the AlphaX CRM
+module, same roles as the reports: Sales User/Sales Manager/System
+Manager) unifying all 7 reports behind one shared filter bar (As Of Date /
+Period Type / Compare Mode / Years Back / Sales Person / Source / City /
+Business Unit) and a row of tabs — one tab per report, each showing that
+report's own KPI summary cards, chart and detail table. One server call
+(`alphax_crm.api.bi_dashboard.get_bi_dashboard_data`) fetches every
+report's output at once by calling each report's own `execute()` function
+directly — there is exactly one implementation of each metric (the report
+itself); the dashboard never recomputes anything separately, so it can't
+drift out of sync with what running the report directly shows. If one
+report's query fails (e.g. a site-specific customization issue), only that
+tab shows an error — the other six still render normally.
+
+All 7 reports and the dashboard dispatcher were verified against the
+synthetic-data test harness (`bi_test/run_tests.py` — see repo notes),
+including filter combinations and compare-mode scenarios, before shipping.
+
+## [0.34.2] — 2026-10-08
+### Fixed — 2 more issues surfaced by a real run against the live site
+Testing 0.34.1 on the real site (not synthetic data) surfaced two more
+problems the earlier fix didn't cover:
+
+**1. The 4 old "(BI)" reports from 0.34.0 were still broken after
+updating to 0.34.1.** 0.34.1's rename fixed the *new* report files, but
+Frappe's standard-report sync keys off name, so it never touches or
+removes an *old*, now-orphaned Report record whose name changed in the
+fixture. The old "AlphaX Lead Stage Tracker (BI)" etc. records were still
+sitting in the Report list, each still pointing at a module that no longer
+exists, so opening one of the old names (e.g. from a bookmark, or the
+sidebar not yet refreshed) still threw the exact same `ModuleNotFoundError`
+as 0.34.0. Added `cleanup_renamed_bi_reports()` to `setup/install.py`,
+run from `after_migrate()`: deletes the 4 old-named Report records if
+present. Idempotent, a no-op on a site that never had 0.34.0.
+
+**2. `pymysql.err.OperationalError: Unknown column 'custom_business_lead_unit'`.**
+This is a real bug, not a stale-record issue: that fieldname came from this
+app's own `crm/smart_lead.py` default Smart-Lead field-mapping table, and I
+treated it as a guaranteed column without confirming it actually exists on
+this site's Lead doctype — it doesn't. Every query/filter touching that
+field now goes through a new `bi_report.business_unit_field()` check
+(`meta.has_field()` first, matching this app's own established defensive
+style elsewhere in the codebase) before referencing the column at all:
+- **AlphaX Lead Stage Tracker BI**, **AlphaX Pipeline Aging BI**, **AlphaX
+  Lost Reason Breakdown BI**: the Business Unit filter is simply ignored
+  when the field doesn't exist — no crash, everything else unaffected.
+- **AlphaX Quotation Value by Business Unit BI**: this report's whole
+  purpose is grouping by that field, so instead of crashing it now groups
+  every row under a single "(not set)" bucket and says plainly in the
+  report's message that the field wasn't found and how to add it (via
+  Customize Form, or by pointing Smart Lead Field Mapping at whichever
+  field this site actually uses for Business Unit).
+
+Also hardened the standalone test harness itself: it was too lenient
+before (a plain Python dict tolerates a missing key; a real MySQL
+`SELECT` on a nonexistent column does not), which is exactly how this
+bug got shipped in 0.34.0/0.34.1 without being caught. It now simulates
+"Unknown column" the same way a real site would, against a Lead schema
+that deliberately omits `custom_business_lead_unit` — all 4 reports were
+re-verified against it and no longer crash.
+
+## [0.34.1] — 2026-10-08
+### Fixed — all 4 new BI reports failed to open ("ModuleNotFoundError")
+Every report added in 0.34.0 was named with a trailing "(BI)", e.g. "AlphaX
+Lead Stage Tracker (BI)". Frappe derives a report's Python module path from
+its `report_name` by lowercasing it and turning spaces/hyphens into
+underscores — but it does **not** strip other punctuation, so "(BI)" was
+carried through literally into `alphax_lead_stage_tracker_(bi)`, which can
+never be a valid Python module name (parentheses aren't legal there) and
+could never match this app's actual file `alphax_lead_stage_tracker_bi.py`.
+Opening any of the 4 reports failed immediately with
+`ModuleNotFoundError: No module named 'alphax_crm.alphax_crm.report.alphax_lead_stage_tracker_(bi)'`.
+
+- Renamed all 4 reports to drop the parentheses (now plain "... BI"):
+  AlphaX Lead Stage Tracker BI, AlphaX Pipeline Aging BI, AlphaX Lost Reason
+  Breakdown BI, AlphaX Quotation Value by Business Unit BI.
+- The 4th report's folder/file names also didn't match its own display name
+  (`alphax_quotation_value_by_unit_bi` vs. "...by **Business** Unit (BI)")
+  — a second, independent instance of the same class of bug. Renamed the
+  folder and files to `alphax_quotation_value_by_business_unit_bi` to match.
+- Re-ran the full synthetic-data test harness against the renamed files to
+  confirm the fix didn't disturb the underlying logic — same results as
+  0.34.0, including the Δ%-vs-zero fix from that release.
+
+If you'd already tried opening these in 0.34.0 and bookmarked/pinned them,
+re-pin from the Report List after updating — the report names changed.
+
+## [0.34.0] — 2026-10-08
+### Added — live "Lead Stage Tracker (BI)" report family, backed by the real database
+Same unified design as the standalone Lead Tracker BI Excel workbook (one
+Period Type selector — Daily/Weekly/Monthly/Quarterly/Half-Yearly/Yearly —
+plus an optional comparison against last year, 1-3 years back), now built
+as four live Frappe reports instead of a spreadsheet, so the numbers are
+always the real current pipeline, not a snapshot someone has to re-export.
+
+New shared engine, `crm/bi_report.py`: the period-window math (identical
+boundaries to the Excel version — verified against it), the comparison-mode
+math (Same Period Last Year / Same Quarter Last Year / Full Last Year), and
+the dimension-filter plumbing every report below shares.
+
+New reports (Report List → search "BI", or Sales User/Sales Manager/System
+Manager roles):
+- **AlphaX Lead Stage Tracker (BI)** — the main funnel: New Leads + a count
+  for every Lead Stage actually configured on this site (read live from
+  Lead's `status` field options — not a hardcoded stage list, so it stays
+  correct if the stage list is ever extended), each with a current-vs-
+  comparison count, Δ and Δ%. Summary cards: New Leads, Won, Lost,
+  Quotation Value (submitted Quotations only). Filterable by Sales Person,
+  Source, City, Business Unit.
+- **AlphaX Pipeline Aging (BI)** — live snapshot: how many Leads are sitting
+  in each stage right now, and the average/oldest number of days they've
+  been there (time since each Lead's last Lead Stage transition, logged
+  automatically in AlphaX Stage Transition Log since 0.3x; falls back to
+  the Lead's creation date for one that's never transitioned).
+- **AlphaX Lost Reason Breakdown (BI)** — lost-reason counts for the
+  selected period, anchored on the native `won_or_lost_date` field (set by
+  WF-06 Closure Controls), with the same comparison option.
+- **AlphaX Quotation Value by Business Unit (BI)** — submitted Quotation
+  value for the period, grouped by Business Unit (`custom_business_lead_unit`
+  on the linked Lead). Grouped by Business Unit rather than "payment type"
+  (the original Excel spec's grouping) because this app has no payment-type
+  field on Quotation — Business Unit is the real, confirmed dimension that
+  does exist, used honestly rather than inventing a field that isn't there.
+
+All four were checked against synthetic data with a standalone test harness
+(not just "the recalculation didn't error" — the actual counts/sums were
+hand-verified against the raw data, the same discipline used for the Excel
+version), including a real bug this caught and fixed before shipping: a
+comparison-period count of zero for a stage/reason/business-unit was being
+read back as `None` (Python dict `.get()` with no default) and wrongly
+treated as "no comparison configured", blanking out Δ/Δ% instead of
+showing a real 0 baseline.
+
+### Notes for pointing this at a pivot/BI tool instead
+Nothing above requires a spreadsheet: every report is a plain Frappe Script
+Report, so it also shows up as a normal data source for the Report View's
+own Group By/pivot controls, for a Frappe Dashboard (Number Cards +
+Dashboard Charts can point at AlphaX Stage Transition Log / Lead / Quotation
+directly), or for an external BI tool connected straight to the site's
+database — the AlphaX Stage Transition Log table is the one to point a BI
+tool at for stage-movement history; Lead and Quotation cover the rest.
+
 ## [0.33.1] — 2026-10-06
 ### Added — one-off repair for Leads already stuck on "Quotation"
 Not a new bug: `guard_quotation_lead_stage` (added in 0.33.0) was confirmed
