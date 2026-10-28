@@ -1,6 +1,6 @@
 {
  "charts": [],
- "content": "[{\"id\":\"alphax_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">AlphaX CRM Automation</span>\",\"col\":12}},{\"id\":\"alphax_sc\",\"type\":\"card\",\"data\":{\"card_name\":\"CRM\",\"col\":4}},{\"id\":\"alphax_settings_card\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}}]",
+ "content": "[{\"id\":\"alphax_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">AlphaX CRM Automation</span>\",\"col\":12}},{\"id\":\"alphax_sc\",\"type\":\"card\",\"data\":{\"card_name\":\"CRM\",\"col\":4}},{\"id\":\"alphax_settings_card\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}},{\"id\":\"MT14d8XQKJ\",\"type\":\"card\",\"data\":{\"card_name\":\"Lead Tracking\",\"col\":4}}]",
  "creation": "2026-01-01 00:00:00.000000",
  "docstatus": 0,
  "doctype": "Workspace",
@@ -146,9 +146,28 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Lead Tracking",
+   "link_count": 1,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Lead Data Quality Monitor",
+   "link_count": 0,
+   "link_to": "Lead Data Quality Monitor",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2026-01-01 00:00:00.000000",
+ "modified": "2026-10-28 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "AlphaX CRM",
  "name": "AlphaX CRM",
