@@ -1,0 +1,35 @@
+{
+    "attach_files": "",
+    "attach_print": 0,
+    "channel": "Email",
+    "condition": "doc.converted == 0 and doc.status not in ('Not Interested', 'Unreachable')",
+    "creation": "2026-10-28 14:40:17.311751",
+    "date_changed": "follow_up_date",
+    "days_in_advance": 0,
+    "docstatus": 0,
+    "doctype": "Notification",
+    "document_type": "AlphaX PreLead",
+    "enabled": 1,
+    "event": "Days Before",
+    "idx": 0,
+    "is_standard": 1,
+    "message": "<p>Dear Team,</p>\n\n<p>\n    This is a reminder that a follow-up with the prospect below is due today.\n    Please review the details and ensure timely communication.\n</p>\n\n<table style=\"border-collapse: collapse; width: 100%; max-width: 600px;\">\n    <tr>\n        <td style=\"padding: 10px; border: 1px solid #ddd; font-weight: bold; width: 35%;\">\n            Prospect Name\n        </td>\n        <td style=\"padding: 10px; border: 1px solid #ddd;\">\n            {{ doc.prospect_name or '-' }}\n        </td>\n    </tr>\n    <tr>\n        <td style=\"padding: 10px; border: 1px solid #ddd; font-weight: bold;\">\n            Company\n        </td>\n        <td style=\"padding: 10px; border: 1px solid #ddd;\">\n            {{ doc.company_name or '-' }}\n        </td>\n    </tr>\n    <tr>\n        <td style=\"padding: 10px; border: 1px solid #ddd; font-weight: bold;\">\n            Contact Number\n        </td>\n        <td style=\"padding: 10px; border: 1px solid #ddd;\">\n            {{ doc.mobile_no or doc.phone or '-' }}\n        </td>\n    </tr>\n    <tr>\n        <td style=\"padding: 10px; border: 1px solid #ddd; font-weight: bold;\">\n            Email Address\n        </td>\n        <td style=\"padding: 10px; border: 1px solid #ddd;\">\n            {{ doc.email_id or '-' }}\n        </td>\n    </tr>\n    <tr>\n        <td style=\"padding: 10px; border: 1px solid #ddd; font-weight: bold;\">\n            Current Status\n        </td>\n        <td style=\"padding: 10px; border: 1px solid #ddd;\">\n            {{ doc.status or '-' }}\n        </td>\n    </tr>\n    <tr>\n        <td style=\"padding: 10px; border: 1px solid #ddd; font-weight: bold;\">\n            Assigned Owner\n        </td>\n        <td style=\"padding: 10px; border: 1px solid #ddd;\">\n            {{ doc.prospect_owner or '-' }}\n        </td>\n    </tr>\n    <tr>\n        <td style=\"padding: 10px; border: 1px solid #ddd; font-weight: bold;\">\n            Follow-up Date\n        </td>\n        <td style=\"padding: 10px; border: 1px solid #ddd;\">\n            <strong>{{ doc.follow_up_date or '-' }}</strong>\n        </td>\n    </tr>\n</table>\n\n<p>\n    Kindly contact the prospect today, update the follow-up status,\n    and record the outcome in AlphaX CRM.\n</p>\n\n<p>\n    Thank you for your attention and cooperation.\n</p>\n\n<p>\n    Best regards,<br>\n    <strong>AlphaX CRM Team</strong>\n</p>",
+    "message_type": "HTML",
+    "modified": "2026-10-28 14:50:20.049438",
+    "modified_by": "Administrator",
+    "module": "AlphaX CRM",
+    "name": "AlphaX PreLead Follow-up Due",
+    "owner": "Administrator",
+    "recipients": [
+        {
+            "receiver_by_document_field": "prospect_owner",
+            "receiver_by_role": "CRM Initiator"
+        },
+        {
+            "receiver_by_role": "Sales Manager"
+        }
+    ],
+    "send_system_notification": 1,
+    "send_to_all_assignees": 1,
+    "subject": "AlphaX: Follow-up due today for {{ doc.prospect_name }} ({{ doc.name }})"
+}

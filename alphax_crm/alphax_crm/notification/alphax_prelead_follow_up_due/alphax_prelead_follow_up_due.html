@@ -1,0 +1,79 @@
+<p>Dear Team,</p>
+
+<p>
+    This is a reminder that a follow-up with the prospect below is due today.
+    Please review the details and ensure timely communication.
+</p>
+
+<table style="border-collapse: collapse; width: 100%; max-width: 600px;">
+    <tr>
+        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; width: 35%;">
+            Prospect Name
+        </td>
+        <td style="padding: 10px; border: 1px solid #ddd;">
+            {{ doc.prospect_name or '-' }}
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">
+            Company
+        </td>
+        <td style="padding: 10px; border: 1px solid #ddd;">
+            {{ doc.company_name or '-' }}
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">
+            Contact Number
+        </td>
+        <td style="padding: 10px; border: 1px solid #ddd;">
+            {{ doc.mobile_no or doc.phone or '-' }}
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">
+            Email Address
+        </td>
+        <td style="padding: 10px; border: 1px solid #ddd;">
+            {{ doc.email_id or '-' }}
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">
+            Current Status
+        </td>
+        <td style="padding: 10px; border: 1px solid #ddd;">
+            {{ doc.status or '-' }}
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">
+            Assigned Owner
+        </td>
+        <td style="padding: 10px; border: 1px solid #ddd;">
+            {{ doc.prospect_owner or '-' }}
+        </td>
+    </tr>
+    <tr>
+        <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">
+            Follow-up Date
+        </td>
+        <td style="padding: 10px; border: 1px solid #ddd;">
+            <strong>{{ doc.follow_up_date or '-' }}</strong>
+        </td>
+    </tr>
+</table>
+
+<p>
+    Kindly contact the prospect today, update the follow-up status,
+    and record the outcome in AlphaX CRM.
+</p>
+
+<p>
+    Thank you for your attention and cooperation.
+</p>
+
+<p>
+    Best regards,<br>
+    <strong>AlphaX CRM Team</strong>
+</p>
