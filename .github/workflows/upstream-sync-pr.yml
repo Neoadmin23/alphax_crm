@@ -1,0 +1,86 @@
+
+name: Sync Upstream Changes
+
+on:
+  schedule:
+    # Daily at 08:30 AM India time
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout fork
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Fetch upstream changes
+        run: |
+          git remote add upstream \
+            https://github.com/jamunachi08/alphax_crm.git
+
+          git fetch upstream main
+          git fetch origin main
+
+      - name: Merge upstream into sync branch
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email \
+            "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git checkout -B automation/upstream-sync origin/main
+
+          git merge --no-edit upstream/main
+
+          if git diff --quiet origin/main HEAD; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push sync branch
+        if: steps.merge.outputs.has_changes == 'true'
+        run: |
+          git push origin \
+            HEAD:refs/heads/automation/upstream-sync \
+            --force
+
+      - name: Create or update upstream PR
+        if: steps.merge.outputs.has_changes == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=$(gh pr list \
+            --repo Neoadmin23/alphax_crm \
+            --head automation/upstream-sync \
+            --base main \
+            --state open \
+            --json number \
+            --jq '.[0].number // empty')
+
+          if [ -z "$PR" ]; then
+            gh pr create \
+              --repo Neoadmin23/alphax_crm \
+              --base main \
+              --head automation/upstream-sync \
+              --title "chore: sync upstream changes" \
+              --body "This PR contains upstream changes from jamunachi08/alphax_crm:main.
+
+          Please review the changes before merging."
+          else
+            echo "Existing upstream sync PR: #$PR"
+          fi
