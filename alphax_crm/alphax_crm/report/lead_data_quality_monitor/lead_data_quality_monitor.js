@@ -75,8 +75,15 @@ frappe.query_reports["Lead Data Quality Monitor"] = {
 			error: () => load_options("workflow_state", "workflow_state"),
 		});
 
-		load_options("lead_stage", "status");
-		load_options("lead_status", "custom_lead_status");
+		const has_custom_lead_status = frappe.meta.has_field("Lead", "custom_lead_status");
+		load_options("lead_status", has_custom_lead_status ? "custom_lead_status" : "status");
+		if (has_custom_lead_status) {
+			load_options("lead_stage", "status");
+		} else {
+			// Without the custom field, Lead Status and Lead Stage are the same
+			// native field; hide the duplicate filter.
+			report.toggle_filter_display("lead_stage", true);
+		}
 
 		// One-click quick filters
 		const clear_all = () => {

@@ -12,13 +12,19 @@ def execute(filters=None):
     filters["max_dq"] = filters.get("max_dq") if filters.get("max_dq") not in (None, "") else filters.get("dq_to")
     MIN_IDLE = frappe.utils.cint(filters.get("idle_days"))
 
+    # The live site may carry a separate "Lead Status" custom field. When it
+    # does not, fall back to the native Lead.status field so the report does
+    # not depend on a Custom Field that the app does not own.
+    HAS_CUSTOM_LEAD_STATUS = frappe.get_meta("Lead").has_field("custom_lead_status")
+    LEAD_STATUS_FIELD = "custom_lead_status" if HAS_CUSTOM_LEAD_STATUS else "status"
+
     # ============================================================
     # CONFIG
     # ============================================================
 
     STALE_IDLE_DAYS = frappe.utils.cint(filters.get("stale_after_days")) or 14   # idle threshold for "Stale"
     CLOSED_STAGES = ["Converted", "Lost Quotation", "Lost with reason", "Do Not Contact"]   # Lead Stage values = closed
-    CLOSED_STATUSES = ["Inactive Lead"]                                                     # Lead Status values = closed
+    CLOSED_STATUSES = ["Inactive Lead"] if HAS_CUSTOM_LEAD_STATUS else []                   # Lead Status values = closed
     LOW_DQ = 50                                                     # DQ % below this = "Low"
 
     # bucket label -> (min_age, max_age)  (None = open-ended)
@@ -47,8 +53,11 @@ def execute(filters=None):
         {"label": "Source", "fieldname": "source", "fieldtype": "Link", "options": "Lead Source", "width": 120},
         {"label": "Lead Owner", "fieldname": "lead_owner", "fieldtype": "Link", "options": "User", "width": 180},
         {"label": "Workflow State", "fieldname": "workflow_state", "fieldtype": "Data", "width": 150},
-        {"label": "Lead Status", "fieldname": "custom_lead_status", "fieldtype": "Data", "width": 130},
-        {"label": "Lead Stage", "fieldname": "status", "fieldtype": "Data", "width": 140},
+        {"label": "Lead Status", "fieldname": "lead_status", "fieldtype": "Data", "width": 130},
+    ]
+    if HAS_CUSTOM_LEAD_STATUS:
+        columns.append({"label": "Lead Stage", "fieldname": "status", "fieldtype": "Data", "width": 140})
+    columns += [
         {"label": "Data Quality %", "fieldname": "alphax_dq_score", "fieldtype": "Percent", "width": 120},
         {"label": "DQ Level", "fieldname": "dq_level", "fieldtype": "Data", "width": 90},
         {"label": "Lead Age (Days)", "fieldname": "lead_age_days", "fieldtype": "Int", "width": 120},
@@ -92,10 +101,10 @@ def execute(filters=None):
         values["workflow_state"] = filters.get("workflow_state")
 
     if filters.get("lead_status"):
-        conditions.append("custom_lead_status = %(lead_status)s")
+        conditions.append(f"{LEAD_STATUS_FIELD} = %(lead_status)s")
         values["lead_status"] = filters.get("lead_status")
 
-    if filters.get("lead_stage"):
+    if HAS_CUSTOM_LEAD_STATUS and filters.get("lead_stage"):
         conditions.append("status = %(lead_stage)s")
         values["lead_stage"] = filters.get("lead_stage")
 
@@ -136,10 +145,10 @@ def execute(filters=None):
     # ============================================================
 
     rows = frappe.db.sql(
-        """
+        f"""
         SELECT
             name, creation, modified, lead_name, company_name, source,
-            lead_owner, workflow_state, custom_lead_status, status,
+            lead_owner, workflow_state, {LEAD_STATUS_FIELD} AS lead_status, status,
             IFNULL(alphax_dq_score, 0) AS alphax_dq_score,
             alphax_last_activity,
             alphax_idle_days,
@@ -189,7 +198,7 @@ def execute(filters=None):
         row["dq_level"] = "High" if dq >= 80 else ("Medium" if dq >= LOW_DQ else "Low")
 
         # Follow-up health
-        is_open = (row.get("status") not in CLOSED_STAGES) and (row.get("custom_lead_status") not in CLOSED_STATUSES)
+        is_open = (row.get("status") not in CLOSED_STAGES) and (row.get("lead_status") not in CLOSED_STATUSES)
         if not is_open:
             row["followup_health"] = "Closed"
         elif idle > STALE_IDLE_DAYS * 2:
