@@ -44,6 +44,10 @@
         return { doctype, name: null, label: __("{0} list", [doctype]) };
     };
 
+    function alphax_ai_saved_language() {
+        try { return localStorage.getItem("alphax_ai_answer_language") || "Auto"; } catch (e) { return "Auto"; }
+    }
+
     function alphax_ai_open_dialog(context) {
         const d = new frappe.ui.Dialog({
             title: __("Ask AI"),
@@ -58,6 +62,20 @@
                 },
                 { fieldname: "conversation", fieldtype: "HTML", options: '<div id="alphax-ai-conversation" style="max-height: 50vh; overflow-y: auto; margin-bottom: 10px;"></div>' },
                 {
+                    fieldname: "answer_language",
+                    fieldtype: "Select",
+                    label: __("Answer in"),
+                    options: [
+                        { value: "Auto", label: __("Same language as my question") },
+                        { value: "English", label: "English" },
+                        { value: "Arabic", label: "العربية (Arabic)" },
+                    ],
+                    default: alphax_ai_saved_language(),
+                    change() {
+                        try { localStorage.setItem("alphax_ai_answer_language", this.get_value()); } catch (e) { /* private mode */ }
+                    },
+                },
+                {
                     fieldname: "question",
                     fieldtype: "Small Text",
                     label: __("Your question"),
@@ -68,7 +86,7 @@
             primary_action() {
                 const q = (d.get_value("question") || "").trim();
                 if (!q) return;
-                alphax_ai_ask(d, q, context);
+                alphax_ai_ask(d, q, context, d.get_value("answer_language"));
             },
         });
         d.show();
@@ -123,8 +141,8 @@
         }, 50);
     }
 
-    function alphax_ai_ask(d, question, context) {
-        alphax_ai_append(d, "user", frappe.utils.escape_html(question));
+    function alphax_ai_ask(d, question, context, language) {
+        alphax_ai_append(d, "user", `<span dir="auto">${frappe.utils.escape_html(question)}</span>`);
         d.set_value("question", "");
         const loading_id = "alphax-ai-loading-" + frappe.utils.get_random(6);
         alphax_ai_append(d, "ai", `<span id="${loading_id}" class="text-muted">${__("Thinking…")}</span>`);
@@ -135,11 +153,13 @@
                 question,
                 context_doctype: context ? context.doctype : null,
                 context_name: context ? context.name : null,
+                language: language && language !== "Auto" ? language : null,
             },
             callback: (r) => {
                 const res = r.message || {};
                 const $loading = d.$wrapper.find("#" + loading_id).closest("div").parent();
-                let html = `<div>${frappe.utils.escape_html(res.answer || "")}</div>`;
+                const rtl = res.language === "Arabic";
+                let html = `<div dir="${rtl ? "rtl" : "auto"}" style="${rtl ? "text-align:right;" : ""}white-space:pre-wrap">${frappe.utils.escape_html(res.answer || "")}</div>`;
                 let chart_div_id = null;
                 if (res.table && res.table.rows && res.table.rows.length) {
                     html += alphax_ai_render_table(res.table.columns, res.table.rows);

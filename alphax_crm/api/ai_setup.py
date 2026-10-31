@@ -74,14 +74,21 @@ def regenerate_setup_token():
 # path is reachable.
 # ---------------------------------------------------------------------------
 @frappe.whitelist()
-def test_ai_connection(base_url=None, chat_path=None, model=None, api_key=None, timeout=None, cf_access_client_id=None):
+def test_ai_connection(base_url=None, chat_path=None, model=None, api_key=None, timeout=None, cf_access_client_id=None,
+        provider=None):
     frappe.only_for("System Manager")
+    from alphax_crm.ai import engine
+
     settings = frappe.get_single("AlphaX CRM Settings")
-    base = (base_url or settings.ai_base_url or "").rstrip("/")
+    # try the values typed into the form, even before Save (Password fields come from the saved doc)
+    for field, value in (("ai_base_url", base_url), ("ai_chat_path", chat_path), ("ai_model", model),
+            ("ai_provider", provider)):
+        if value is not None:
+            settings.set(field, value)
+    base = (settings.ai_base_url or "").rstrip("/")
     if not base:
         return {"ok": False, "message": str(_("Enter an AI Base URL first."))}
-    chat_path = chat_path or settings.ai_chat_path or "/api/chat"
-    model = model or settings.ai_model or "llama3.2:3b"
+    model = settings.ai_model or "llama3.2:3b"
     try:
         req_timeout = int(timeout) if timeout else (settings.ai_timeout or 30)
     except (TypeError, ValueError):
@@ -89,50 +96,56 @@ def test_ai_connection(base_url=None, chat_path=None, model=None, api_key=None, 
 
     import requests
 
-    # api_key/cf_access_client_id here let the button try a value that's
-    # been typed into the form but not saved yet; the CF Access *secret*
-    # always comes from the saved settings (Password fields never reach the
-    # browser), so testing a brand-new secret still requires Save first.
     headers = ai_request_headers(settings, api_key=api_key, cf_access_client_id=cf_access_client_id)
+    kind = engine.provider(settings)
+    url = engine.chat_url(settings)
 
-    # Cheap reachability + model-list check first (Ollama's native endpoint).
+    # Cheap reachability + model-list check first.
     models = []
     try:
-        tags_resp = requests.get(f"{base}/api/tags", headers=headers, timeout=req_timeout)
-        if tags_resp.ok:
-            models = [m.get("name") for m in tags_resp.json().get("models", [])]
+        if kind == "Ollama":
+            tags_resp = requests.get(f"{base}/api/tags", headers=headers, timeout=req_timeout)
+            if tags_resp.ok:
+                models = [m.get("name") for m in tags_resp.json().get("models", [])]
+        else:
+            root = url.rsplit("/chat/completions", 1)[0]
+            list_resp = requests.get(f"{root}/models", headers=headers, timeout=req_timeout)
+            if list_resp.ok:
+                models = [m.get("id") for m in list_resp.json().get("data", [])]
     except Exception:
-        pass  # not fatal — some setups (OpenAI-compatible gateways) won't have /api/tags
+        pass  # not fatal: some gateways do not list models
 
     try:
-        resp = requests.post(
-            f"{base}{chat_path}",
-            json={
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": "You are a connection test."},
-                    {"role": "user", "content": "Reply with the single word: OK."},
-                ],
-                "stream": False,
-            },
-            headers=headers,
-            timeout=req_timeout,
-        )
+        body = {
+            "model": model,
+            "messages": [
+                {"role": "system", "content": "You are a connection test."},
+                {"role": "user", "content": "Reply with the single word: OK."},
+            ],
+        }
+        if kind == "Ollama":
+            body["stream"] = False
+        else:
+            body["max_tokens"] = 20
+        resp = requests.post(url, json=body, headers=headers, timeout=req_timeout)
         resp.raise_for_status()
         data = resp.json()
         reply = (data.get("message") or {}).get("content") or (
             data.get("choices", [{}])[0].get("message", {}).get("content") if data.get("choices") else None
         )
-        message = str(_("Connected. Model replied: {0}")).format((reply or "").strip()[:120])
+        message = str(_("Connected ({0}). Model replied: {1}")).format(kind, (reply or "").strip()[:120])
         if models and model not in models:
             message += " " + str(_("Warning: model \"{0}\" was not in the server's installed list ({1}).")).format(
                 model, ", ".join(models)
             )
+        fast = settings.get("ai_fast_model")
+        if models and fast and fast not in models:
+            message += " " + str(_("Warning: fast model \"{0}\" is not installed.")).format(fast)
         return {"ok": True, "message": message, "models": models}
     except Exception as e:
         return {
             "ok": False,
-            "message": str(_("Could not reach {0}{1}: {2}")).format(base, chat_path, str(e)),
+            "message": str(_("Could not reach {0}: {1}")).format(url, str(e)),
             "models": models,
         }
 
@@ -150,6 +163,10 @@ def register_endpoint(token=None, base_url=None, model=None):
         frappe.throw(_("Invalid or expired setup token — download a fresh script from Settings."), frappe.AuthenticationError)
 
     settings.ai_base_url = base_url.strip()
+    # the setup script always installs Ollama: make sure the provider matches
+    if settings.meta.has_field("ai_provider"):
+        settings.ai_provider = "Ollama"
+        settings.ai_chat_path = "/api/chat"
     if model:
         settings.ai_model = model.strip()
     settings.ai_enabled = 1

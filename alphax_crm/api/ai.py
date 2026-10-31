@@ -8,10 +8,7 @@ Functions here are invoked as background jobs (see crm/lead.py, crm/opportunity.
 so a slow model never blocks a document save.
 """
 
-import json
-
 import frappe
-from frappe.utils import now_datetime
 
 from alphax_crm.crm.utils import ai_request_headers, get_settings, log_error
 
@@ -19,38 +16,12 @@ from alphax_crm.crm.utils import ai_request_headers, get_settings, log_error
 # ---------------------------------------------------------------------------
 # Transport
 # ---------------------------------------------------------------------------
-def _chat(system, user, settings=None, expect_json=False):
-    """Call the configured local model. Ollama /api/chat by default."""
-    settings = settings or get_settings()
-    base = (settings.ai_base_url or "http://localhost:11434").rstrip("/")
-    model = settings.ai_model or "llama3.1"
-    url = f"{base}{settings.ai_chat_path or '/api/chat'}"
+def _chat(system, user, settings=None, expect_json=False, feature="adhoc", reference=None):
+    """Call the configured model through the AlphaX AI engine (provider choice,
+    governance, PII masking and the AI log all live in alphax_crm/ai/engine.py)."""
+    from alphax_crm.ai.engine import complete
 
-    import requests  # lazy import; available in the Frappe bench env
-
-    body = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "stream": False,
-        "options": {"temperature": 0.2},
-    }
-    if expect_json:
-        body["format"] = "json"
-
-    headers = ai_request_headers(settings)
-
-    resp = requests.post(url, json=body, headers=headers, timeout=settings.ai_timeout or 60)
-    resp.raise_for_status()
-    data = resp.json()
-    # Ollama: {"message": {"content": "..."}}; OpenAI-style fallback handled too.
-    if "message" in data:
-        return data["message"]["content"]
-    if "choices" in data:
-        return data["choices"][0]["message"]["content"]
-    return json.dumps(data)
+    return complete(system, user, feature=feature, reference=reference, want_json=expect_json, temperature=0.2)
 
 
 # ---------------------------------------------------------------------------
@@ -79,6 +50,14 @@ def process_lead(lead):
         except Exception:
             log_error("ai draft reply")
 
+    if settings.get("ai_next_action_on_new_lead"):
+        try:
+            from alphax_crm.ai.sales import next_best_action
+
+            next_best_action(doc.name)
+        except Exception:
+            log_error("ai next action")
+
     frappe.db.commit()
 
 
@@ -103,9 +82,11 @@ def _classify(doc, context, settings):
         '{"fit": "High|Medium|Low", "urgency": "High|Medium|Low", '
         '"intent": "one short phrase", "summary": "one sentence"}.'
     )
-    raw = _chat(system, context, settings, expect_json=True)
+    raw = _chat(system, context, settings, expect_json=True, feature="lead_classify", reference=("Lead", doc.name))
     try:
-        result = json.loads(raw)
+        from alphax_crm.ai.pure import extract_json
+
+        result = extract_json(raw)
     except Exception:
         result = {"summary": raw[:240]}
 
@@ -123,7 +104,7 @@ def _draft_reply(doc, context, settings):
         f"response to this inbound lead. {lang} Keep it under 120 words. "
         "Do not invent pricing or commitments."
     )
-    draft = _chat(system, context, settings)
+    draft = _chat(system, context, settings, feature="lead_draft_reply", reference=("Lead", doc.name))
     frappe.db.set_value("Lead", doc.name, "alphax_ai_draft_reply", draft, update_modified=False)
 
 
@@ -158,7 +139,7 @@ def summarize_opportunity(opportunity):
     user = f"Opportunity: {opp.name}\nStatus: {opp.status}\n\nThread:\n{thread}"
 
     try:
-        brief = _chat(system, user, settings)
+        brief = _chat(system, user, settings, feature="opportunity_brief", reference=("Opportunity", opportunity))
     except Exception:
         log_error("ai opportunity brief")
         return None

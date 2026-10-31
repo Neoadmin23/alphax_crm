@@ -5,7 +5,17 @@
 // button can't install software on an arbitrary PC, and what this does
 // instead).
 frappe.ui.form.on("AlphaX CRM Settings", {
+    ai_provider(frm) {
+        // suggest the matching chat path when the server type changes
+        if (frm.doc.ai_provider === "OpenAI Compatible" && (!frm.doc.ai_chat_path || frm.doc.ai_chat_path === "/api/chat")) {
+            frm.set_value("ai_chat_path", "/v1/chat/completions");
+        } else if (frm.doc.ai_provider === "Ollama" && (!frm.doc.ai_chat_path || frm.doc.ai_chat_path.includes("chat/completions"))) {
+            frm.set_value("ai_chat_path", "/api/chat");
+        }
+    },
     refresh(frm) {
+        frm.add_custom_button(__("Run Health Check"), () => alphax_health_check()).addClass("btn-primary");
+        frm.add_custom_button(__("Automation Log"), () => frappe.set_route("List", "AlphaX Automation Log"), __("View"));
         frm.add_custom_button(__("Test AI Connection"), () => alphax_test_ai_connection(frm), __("AI Assist"));
 
         ["windows", "mac", "linux"].forEach((os_name) => {
@@ -30,6 +40,7 @@ frappe.ui.form.on("AlphaX CRM Settings", {
             );
         }, __("AI Assist"));
 
+        alphax_render_ai_usage(frm);
         frappe.realtime.off("alphax_ai_endpoint_registered");
         frappe.realtime.on("alphax_ai_endpoint_registered", (data) => {
             frappe.show_alert({
@@ -46,6 +57,7 @@ function alphax_test_ai_connection(frm) {
         method: "alphax_crm.api.ai_setup.test_ai_connection",
         args: {
             base_url: frm.doc.ai_base_url,
+            provider: frm.doc.ai_provider,
             chat_path: frm.doc.ai_chat_path,
             model: frm.doc.ai_model,
             // ai_api_key / ai_cf_access_client_secret are Password fields —
@@ -126,4 +138,62 @@ function alphax_download_setup_script(os_name) {
         },
     });
     d.show();
+}
+
+// Today's AI usage under AI Governance (calls, tokens vs. the daily limit, failures).
+function alphax_render_ai_usage(frm) {
+    const field = frm.get_field("ai_usage_html");
+    if (!field || !frm.doc.ai_enabled) return;
+    frappe.call({
+        method: "alphax_crm.ai.engine.get_usage",
+        callback: (r) => {
+            const u = r.message || {};
+            const limit = u.budget ? `${format_number(u.tokens, null, 0)} / ${format_number(u.budget, null, 0)}` : `${format_number(u.tokens, null, 0)} (${__("no limit")})`;
+            field.$wrapper.html(`<div class="text-muted small" style="margin-top:8px">
+                <b>${__("Usage today")}</b><br>
+                ${__("AI calls")}: ${u.calls || 0} · ${__("Tokens")}: ${limit}<br>
+                ${__("Failed")}: ${u.failed || 0} · ${__("Blocked")}: ${u.blocked || 0}<br>
+                ${__("Server")}: ${frappe.utils.escape_html(u.provider || "")} · ${frappe.utils.escape_html(u.url || "")}<br>
+                <a href="/app/alphax-ai-log">${__("Open AI Log")}</a></div>`);
+        },
+    });
+}
+
+// Health check: configuration, data and runtime against the approved workflow spec.
+function alphax_health_check(result) {
+    const show = (res) => {
+        const icon = { ok: "🟢", warn: "🟠", fail: "🔴" };
+        const order = { fail: 0, warn: 1, ok: 2 };
+        const checks = (res.checks || []).slice().sort((a, b) => order[a.status] - order[b.status]);
+        const rows = checks.map((c) => `<tr>
+            <td style="white-space:nowrap">${icon[c.status] || ""}</td>
+            <td><span class="text-muted small">${frappe.utils.escape_html(c.area)}</span><br><b>${frappe.utils.escape_html(c.title)}</b></td>
+            <td class="small">${frappe.utils.escape_html(c.detail || "")}</td>
+            <td>${c.fix ? `<button class="btn btn-xs btn-default ax-fix" data-fix="${c.fix}">${__("Fix")}</button>` : ""}</td></tr>`).join("");
+        const s = res.summary || {};
+        const d = new frappe.ui.Dialog({
+            title: __("AlphaX Health Check"),
+            size: "extra-large",
+            fields: [{ fieldname: "body", fieldtype: "HTML" }],
+            primary_action_label: __("Run Again"),
+            primary_action() { d.hide(); alphax_health_check(); },
+        });
+        d.fields_dict.body.$wrapper.html(`
+            <p>${icon.fail} ${__("Problems")}: ${s.fail || 0} · ${icon.warn} ${__("Warnings")}: ${s.warn || 0} · ${icon.ok} ${__("OK")}: ${s.ok || 0}</p>
+            <div style="max-height:65vh;overflow:auto"><table class="table table-sm">
+            <thead><tr><th></th><th>${__("Check")}</th><th>${__("Details")}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`);
+        d.fields_dict.body.$wrapper.find(".ax-fix").on("click", function () {
+            const fix = $(this).attr("data-fix");
+            frappe.confirm(__("Apply this fix to AlphaX CRM Settings?"), () =>
+                frappe.call({ method: "alphax_crm.crm.health.apply_fix", args: { fix }, freeze: true }).then((r) => {
+                    d.hide();
+                    cur_frm && cur_frm.reload_doc();
+                    show(r.message || {});
+                }));
+        });
+        d.show();
+    };
+    if (result) return show(result);
+    frappe.call({ method: "alphax_crm.crm.health.run_health_check", freeze: true, freeze_message: __("Checking…") })
+        .then((r) => show(r.message || {}));
 }

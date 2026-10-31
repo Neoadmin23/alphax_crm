@@ -18,13 +18,9 @@ from alphax_crm.crm.utils import get_settings, log_error
 
 
 def on_submit(doc, method=None):
-    settings = get_settings()
-    if not settings.get("notify_approvers_on_quotation", 1):
-        return
-    try:
-        _notify_approvers(doc, settings)
-    except Exception:
-        log_error("quotation submit notify")
+    """Approver notification now lives in crm/workflow.py (WF-02/WF-03): email + in-app,
+    business hours, de-duplicated and logged. Kept as a no-op for hook compatibility."""
+    return
 
 
 # ---------------------------------------------------------------------------
@@ -56,11 +52,18 @@ def guard_lead_stage(doc, method=None):
     # Only step in once the deal itself is off — a normal submit that
     # advances the pipeline SHOULD set Lead Stage to "Quotation"; that's
     # core working as intended, not the bug being guarded against here.
-    deal_is_off = doc.get("status") == "Lost" or doc.docstatus == 2
+    # Only a quotation marked Lost ends the deal. A cancelled quotation is usually being
+    # amended (cancel -> amend -> resubmit), so it must not push the Lead to Lost Quotation.
+    deal_is_off = doc.get("status") == "Lost"
     if not deal_is_off:
         return
+    if doc.flags.get("alphax_lost_handled"):
+        return
+    doc.flags.alphax_lost_handled = True
     try:
-        _restore_lead_stage(doc, settings)
+        from alphax_crm.crm.workflow import quotation_marked_lost
+
+        quotation_marked_lost(doc)
     except Exception:
         log_error("guard lead stage after quotation sync")
 
@@ -91,14 +94,10 @@ def _restore_lead_stage(doc, settings):
     if meta.has_field("won_or_lost_date") and not frappe.db.get_value("Lead", doc.party_name, "won_or_lost_date"):
         frappe.db.set_value("Lead", doc.party_name, "won_or_lost_date", frappe.utils.nowdate(), update_modified=False)
 
-    lead_doc = frappe.get_doc("Lead", doc.party_name)
-    lead_doc.add_comment(
-        "Comment",
-        text=(
-            f"AlphaX: Lead Stage auto-corrected to \"{lost_quotation_stage}\" — linked Quotation "
-            f"{doc.name} is Lost/cancelled, and ERPNext had reset Lead Stage back to \"Quotation\"."
-        ),
-    )
+    from alphax_crm.crm.automation import system_comment
+
+    system_comment("Lead", doc.party_name,
+        f"AlphaX: Lead Stage set to \"{lost_quotation_stage}\" because Quotation {doc.name} was marked Lost.")
 
 
 @frappe.whitelist()
@@ -122,13 +121,10 @@ def backfill_lead_stage_for_lost_quotations():
     frappe.only_for("System Manager")
     settings = get_settings()
 
+    # Lost only: a cancelled quotation is normally being amended and must not close the Lead
     candidates = frappe.get_all(
         "Quotation",
-        filters=[
-            ["quotation_to", "=", "Lead"],
-            ["party_name", "is", "set"],
-        ],
-        or_filters=[["status", "=", "Lost"], ["docstatus", "=", 2]],
+        filters=[["quotation_to", "=", "Lead"], ["party_name", "is", "set"], ["status", "=", "Lost"]],
         fields=["name", "party_name", "status", "docstatus"],
     )
 

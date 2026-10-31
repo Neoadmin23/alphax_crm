@@ -78,6 +78,10 @@ def _stamp_consent(doc):
 # ---------------------------------------------------------------------------
 def validate(doc, method=None):
     settings = get_settings()
+    # undo ERPNext core's status side-effect first, so scoring rules see the real stage
+    from alphax_crm.crm import workflow
+
+    workflow.protect_stage_from_core(doc, settings)
     if settings.scoring_enabled:
         score, breakdown = compute_score(doc, settings)
         doc.alphax_lead_score = score
@@ -93,8 +97,12 @@ def validate(doc, method=None):
     except Exception:
         log_error("data quality enforce")
 
-    # Lead Status -> Lead Stage automation.
-    _sync_stage_from_status(doc, settings)
+    # Spec A + WF-01 + WF-05: keep the stage the user chose (ERPNext core's set_status would
+    # overwrite it), sync Lead Stage <-> Lead Status both ways, allow approved stages only,
+    # and require a Next Contact Date for Postponed. See crm/workflow.py.
+    from alphax_crm.crm import workflow
+
+    workflow.lead_validate(doc, settings)
 
     # WF-01 stage progression control + WF-06 closure controls — run AFTER
     # the automation above, since that may itself change Lead Stage, and
@@ -104,6 +112,12 @@ def validate(doc, method=None):
 
     stage_flow.enforce_stage_flow(doc, settings)
     stage_flow.enforce_closure_controls(doc, settings)
+
+
+def before_validate(doc, method=None):
+    from alphax_crm.crm import workflow
+
+    workflow.lead_before_validate(doc)
 
 
 # ---------------------------------------------------------------------------
@@ -260,6 +274,14 @@ def after_insert(doc, method=None):
             update_modified=False,
         )
 
+    # New-lead alert to the Lead Owner (business hours, email + in-app, logged).
+    try:
+        from alphax_crm.crm.workflow import new_lead_alert
+
+        new_lead_alert(doc)
+    except Exception:
+        log_error("new lead alert")
+
     # Auto-promote hot leads to an Opportunity.
     try:
         if (
@@ -310,6 +332,12 @@ def on_update(doc, method=None):
 
     _log_workflow_transition(doc, before, settings)
     _seed_postponed_followup(doc, before, settings)
+    try:
+        from alphax_crm.crm import workflow
+
+        workflow.lead_on_update(doc, before, settings)
+    except Exception:
+        log_error("workflow on_update")
 
     if not settings.get("activity_monitor_enabled", 1) or not settings.get("capture_status_change", 1):
         return
@@ -346,20 +374,24 @@ def _seed_postponed_followup(doc, before, settings):
     if new_stage != postponed or old_stage == postponed:
         return
     if frappe.db.exists("AlphaX Follow-up", {
-        "reference_doctype": "Lead", "reference_name": doc.name, "next_follow_up_date": ["is", "not set"],
+        "reference_doctype": "Lead", "reference_name": doc.name, "summary": ["like", "AlphaX: Lead postponed%"],
+        "creation": [">", frappe.utils.add_days(now_datetime(), -1)],
     }):
         return  # a blank one is already pending — don't pile up duplicates.
     try:
-        frappe.get_doc({
+        fup = frappe.get_doc({
             "doctype": "AlphaX Follow-up",
             "reference_doctype": "Lead",
             "reference_name": doc.name,
             "follow_up_datetime": now_datetime(),
             "agent": doc.get("lead_owner") or frappe.session.user,
             "channel": "Other",
-            "summary": "AlphaX: Lead postponed — set a Next Follow-up Date.",
-            "next_action": "Set next follow-up date",
-        }).insert(ignore_permissions=True)
+            "summary": "AlphaX: Lead postponed — log the next follow-up here.",
+            "next_action": "Follow up on the postponed lead",
+            "next_follow_up_date": doc.get("alphax_next_contact_date"),
+        })
+        fup.flags.alphax_system = True  # a placeholder, not a contact: never counted as activity
+        fup.insert(ignore_permissions=True)
     except Exception:
         log_error("seed postponed follow-up")
 

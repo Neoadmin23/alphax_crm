@@ -46,13 +46,21 @@ def enforce_stage_flow(doc, settings=None):
     if not transitions:
         return
 
-    before = doc.get_doc_before_save()
-    if not before:
-        return
-    old_stage = (before.get(_STAGE_FIELD) or "").strip()
+    if doc.flags.get("alphax_system_stage"):
+        return  # a documented system move (e.g. WF-03 Quotation submitted)
+
+    # Read the stored value: get_doc_before_save() is empty for list-view quick edits and
+    # Kanban drags, which would otherwise let those skip stages.
+    old_stage = (frappe.db.get_value(doc.doctype, doc.name, _STAGE_FIELD) or "").strip()
     new_stage = (doc.get(_STAGE_FIELD) or "").strip()
     if not old_stage or not new_stage or old_stage.lower() == new_stage.lower():
         return
+    from alphax_crm.crm.workflow import approved_stages, initial_stage
+
+    if old_stage.lower() not in {x.lower() for x in approved_stages(settings)}:
+        old_stage = initial_stage(settings)  # legacy value (Open, Replied...): continue from the start
+        if old_stage.lower() == new_stage.lower():
+            return
 
     bypass_roles = {r.strip() for r in (settings.get("stage_flow_bypass_roles") or "").split(",") if r.strip()}
     if bypass_roles & set(frappe.get_roles()):
@@ -91,8 +99,14 @@ def enforce_closure_controls(doc, settings=None):
     won_value = (settings.get("won_stage_value") or "Won").strip()
     lost_values = {s.strip().lower() for s in (settings.get("lost_stage_values") or "").split(",") if s.strip()}
 
+    lost_quotation = (settings.get("lost_quotation_stage_value") or "Lost Quotation").strip().lower()
     if stage.lower() == won_value.lower():
         _enforce_won(doc, settings)
+    elif stage.lower() == lost_quotation:
+        # WF-06: Lost Quotation is proven by the linked quotation (marked Lost, with a reason)
+        from alphax_crm.crm.workflow import check_lost_quotation
+
+        check_lost_quotation(doc, settings)
     elif stage.lower() in lost_values:
         _enforce_lost(doc, settings)
 

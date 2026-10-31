@@ -34,7 +34,8 @@
    "in_standard_filter": 1,
    "label": "Record",
    "options": "reference_doctype",
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_ref",
@@ -45,7 +46,8 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Tracked Field"
+   "label": "Tracked Field",
+   "search_index": 1
   },
   {
    "fieldname": "from_value",
@@ -72,7 +74,8 @@
    "fieldname": "changed_on",
    "fieldtype": "Datetime",
    "in_list_view": 1,
-   "label": "Changed On"
+   "label": "Changed On",
+   "search_index": 1
   },
   {
    "description": "Days elapsed since this record's previous change of the same tracked field (the “day gap between actions”).",

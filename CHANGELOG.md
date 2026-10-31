@@ -3,6 +3,126 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.41.0] — 2026-10-28
+### Audit against the approved Lead workflow spec (A, WF-01…WF-07, C) — gaps closed, bugs fixed, health check
+See **SPEC_COMPLIANCE.md** for the requirement-by-requirement result and how each was tested.
+
+**Fixed after an independent code review (robustness at production scale)**
+- Cancelling a quotation and **Set as Lost** no longer let ERPNext change the Lead Stage unnoticed
+  (cancel and update-after-submit skip `validate`; the stage is now stashed in `before_cancel` and recovered
+  from AlphaX's own transition log). Set as Lost with another quotation still open keeps the Lead's stage
+  *and* status, and every outcome is logged.
+- **WF-04** now also follows quotations ERPNext has already flipped to *Expired*: the T0 alert for weekend
+  expiries and the T+3 escalation could never fire before. T-2 counts working days (a quotation valid till
+  Sunday is reminded on Thursday). T+3 is skipped when someone acted after the expiry ("if no action").
+- **WF-05** evaluates every SLA rule on its own: a day-4 approver notice that fell on a Friday is sent on
+  Sunday instead of being swallowed by a later follow-up; repeated reminders measure idle time from the
+  previous reminder. A later reminder to the same people on the same morning supersedes an older one (logged).
+- **Go-live date**: Leads that were already at a stage before 0.41 start their SLA clock at installation, so
+  the first 08:00 run does not send thousands of "overdue" reminders.
+- **Scale**: the 08:00 rules run as separate jobs on the long queue (1 h timeout), page through all Leads
+  (no 5,000 cap), commit per Lead; composite index on the stage-transition log.
+- System stage moves update `modified`, so a form opened earlier cannot silently write the old stage back.
+- Old Leads with a legacy stage (Open, Replied…) stay editable after a quotation/opportunity exists.
+- Quotation save/submit can no longer fail because of a notification error.
+- **Confirm Lost Quotation** checks Lead write permission, refuses closed Leads and follows the same
+  "other open quotation" rule as Set as Lost.
+- Notifications with no recipient are retried next day (not burned); failed emails retry 3× an hour apart.
+- WF-03 confirmations respect business hours (spec C). Activity detection no longer ignores real comments
+  that merely start with "AlphaX". Lost-quotation digest counts *new* leads from the transition log.
+  Holiday look-back extended to 30 days (long Eid breaks). Scoring sees the real stage. The manual repair
+  tool no longer treats cancelled quotations as lost.
+
+**Fixed — existing behaviour that broke the approved flow**
+- **ERPNext core silently overwrote Lead Stage.** Core `Lead.set_status()` runs on every save and forces
+  "Quotation" once a quotation is submitted, "Opportunity" once an opportunity exists and "Converted" once a
+  Customer is created. A Lead moved to *Contract Under Signing* was saved back as *Quotation*; creating the
+  Customer for *Won* pushed it to *Converted*. AlphaX now keeps the stage the user chose (Lead save, Quotation
+  submit/cancel, Opportunity and Customer saves).
+- **WF-01 could be bypassed** by list-view quick edits / Kanban drags (the check relied on an in-memory "before"
+  value that those paths do not fill). It now reads the stored stage.
+- **System notes counted as sales activity**: AlphaX's own "AlphaX SLA: …" comments and the Postponed
+  placeholder follow-up reset "last activity", so the *second* reminder and the approver alert never fired.
+- **Direct stage changes were not logged**, so SLA day counts started from the Lead's creation date.
+- **SLA reminders were missed** if the job did not run on the exact day (weekends); now "on or after", once.
+- **Cancelling a quotation to amend it** pushed the Lead to *Lost Quotation*. Only *Set as Lost* does now, and only
+  when no other open quotation remains.
+- **Notification setup failed on every migrate** on sites without the "AlphaX Lead Reviewer" role.
+
+**Added — spec items that were missing or partial**
+- **A**: Lead Stage ↔ Lead Status mapping in both directions with the 9 approved rows (the old seed mapped
+  Lead → *Qualified lead*). Existing sites still on the old seed are upgraded automatically.
+- **WF-01**: only approved stages are selectable and accepted; new/imported leads start at *Lead*; legacy values
+  (Open, Replied…) continue from the start.
+- **WF-02**: Quotation existence check on entering *Quotation* (direct, via the Customer, via the Opportunity):
+  immediate alert to owner and assignees, reminder after 24 working hours, escalation after 72; approvers are
+  told whenever an agent creates (and submits) a quotation.
+- **WF-03**: confirmation email + in-app to Lead Owner and creator with No., Date, Valid Till, Amount, Lead;
+  earlier-stage Lead moved to *Quotation* and logged; Valid Till mandatory on Lead quotations.
+- **WF-04**: daily 08:00 on working days: T-2 reminder + AI-drafted client follow-up (no activity) or validity
+  notice (activity); T0 alert to owner and Sales Manager; T+3 escalation proposing *Lost Quotation*, which the
+  user confirms (**Confirm Lost Quotation**); improved daily lost-quotation digest (new since last working day,
+  totals, top reasons).
+- **WF-05**: Postponed requires choosing a Next Contact Date (form prompt) and creates the next follow-up with
+  that date; Contract Under Signing follow-up repeats every 3 days, approver on day 4, escalation day 10, alert when
+  the Expected Closing Date passes; reminders pause while *Returned for Correction*.
+- **WF-06**: *Lost Quotation* requires a linked quotation marked Lost with a reason.
+- **WF-07**: **AI Lead Brief** (history, last interaction, open items); **intent detection** on inbound client
+  emails (interested / revision / postpone / rejected / ready to sign) with a suggested stage the user applies with
+  **Apply Suggested Stage**; follow-up drafts in the lead's language; next best action notifies instead of writing
+  ToDos (AI write limits).
+- **C**: one notifier for every rule: in-app + email through the ERPNext email account, logged on the Lead
+  timeline (as *Automated Message*, never counted as activity); working days Sun–Thu, business hours, optional
+  Holiday List, messages outside hours queued to the next opening; unique key Lead + Rule + Reference + Trigger
+  Date; **AlphaX Automation Log** records rule, lead, recipients, time and result. The two always-on Frappe email
+  notifications (New Lead Alert, Follow-up Due) are replaced by business-hours equivalents.
+- **Health Check** (AlphaX CRM Settings → Run Health Check): 40+ checks on runtime, configuration, data and AI,
+  with one-click fixes for stage options, mapping, transitions and SLA rules.
+
+## [0.40.0] — 2026-10-28
+### Added — AlphaX AI: stronger engine, writing tools (spell check + translate), Sales AI
+**1. AI engine (`alphax_crm/ai/engine.py`).** Every AI call (lead classification, first-reply draft,
+opportunity brief, Ask AI, and the new features) now goes through one gateway:
+- **AI Server Type**: Ollama *or* any OpenAI-compatible server (LocalAI, vLLM, LM Studio, a company gateway).
+  Existing sites keep working: the type is detected from the saved Chat Path.
+- **Structured output**: a JSON schema is sent to the server so small local models return valid JSON.
+- **Optional Fast Model** for writing tools, **Max Answer Length**, **Disable Model Thinking** (reasoning models).
+- **AI Governance (PDPL)**: KSA Data Residency Mode (private-network or Allowed AI Hosts only), email/phone
+  masking that is restored in the answer, a daily token limit, and **AlphaX AI Log** (feature, user,
+  record, model, status, tokens, latency, optional excerpts; retention purge). Settings shows usage today.
+- Test AI Connection understands both server types and checks the fast model is installed.
+
+**2. Writing tools on CRM forms (`alphax_crm/ai/writing.py`, `public/js/alphax_ai_writing.js`).** A small
+**✦ AI** button on text fields (Lead, Opportunity, PreLead, Smart Lead, Follow-up, Quotation, Customer,
+Prospect, Contact, Email Draft, ToDo, Event; configurable): Check spelling, **Translate to Arabic / English**,
+Improve wording, Make more formal, Shorten. Results open in a side-by-side preview with Replace,
+Add Below Original (translations) or Copy; nothing changes until the user clicks.
+**Arabic + English spell check while typing** (Suggest with Apply / keep / add-to-dictionary, or
+Auto-correct with Undo). Safety rules enforced in code: only word-level spelling fixes are applied;
+numbers, codes, abbreviations, links, names and dictionary terms are never changed; HTML formatting is kept;
+translation protects codes/emails/phones/URLs/brand terms and warns if a value is lost or a number changes.
+Address, contact and technical fields are excluded.
+**AlphaX AI Term**: one list that is both the spell-check dictionary and the translation glossary
+(preferred Arabic/English wording, or Keep As Is for brands).
+
+**3. Ask AI answers in Arabic or English.** New *Answer in* choice (Same as my question / English /
+العربية), remembered per browser; Arabic answers display right-to-left.
+
+**4. Sales AI (`alphax_crm/ai/sales.py`).** On the Lead form, **AlphaX AI** menu:
+- **Next Best Action**: concrete next step, channel and date from the lead's history, follow-ups and
+  quotations, saved to new AI fields plus a ToDo for the lead owner. AlphaX's rule-based Lead Score and the
+  salesperson's own Next Contact Date are never overwritten. Optional: run for new leads, when a lead
+  replies, and a daily refresh of quiet leads.
+- **Research Website**: company brief from the lead's own website (blocks internal network addresses).
+- **Draft Follow-up Emails**: a 1-6 email sequence (English or Arabic) as **AlphaX Email Draft** records;
+  each must be **approved** before it is sent on its scheduled day; pending ones are cancelled automatically
+  when the lead replies.
+- **Quotation expiry watch** (daily): ToDo for the owner before a submitted quotation expires, optionally with
+  a drafted reminder email; **Draft Expiry Reminder** button on Quotation.
+
+### Fixed
+- Version numbers aligned to 0.40.0 in `setup.py`, `VERSION` and the README.
+
 ## [0.39.0] — 2026-10-11
 ### Added — "Lead performance" screen built from the design mockup (first tab of /alphax-bi)
 One period-driven report replacing the separate Daily / Weekly / Monthly summaries:

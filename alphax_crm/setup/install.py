@@ -10,6 +10,7 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
 
 def after_install():
     setup_custom_fields()
+    ensure_ai_defaults()
     fix_fetch_overwrite_fields()
     setup_accounting_dimensions()
     seed_default_settings()
@@ -28,6 +29,7 @@ def after_install():
     ensure_wf_defaults()
     seed_stage_sla_rules()
     setup_notifications()
+    retire_replaced_notifications()
     setup_lead_approval_workflow()
     frappe.db.commit()
 
@@ -38,6 +40,7 @@ def after_migrate():
     retire_duplicate_closure_fields()
     cleanup_renamed_bi_reports()
     setup_custom_fields()
+    ensure_ai_defaults()
     fix_fetch_overwrite_fields()
     setup_accounting_dimensions()
     ensure_whatsapp_defaults()
@@ -54,7 +57,9 @@ def after_migrate():
     ensure_closure_defaults()
     ensure_wf_defaults()
     seed_stage_sla_rules()
+    upgrade_workflow_defaults()
     setup_notifications()
+    retire_replaced_notifications()
     setup_lead_approval_workflow()
     frappe.db.commit()
 
@@ -272,6 +277,8 @@ def _default_stage_transitions():
         ("Qualified lead", "Quotation"),
         ("Quotation", "Postponed"),
         ("Quotation", "Contract Under Signing"),
+        # WF-04: an expired quotation can be confirmed as Lost Quotation from the Quotation stage
+        ("Quotation", "Lost Quotation"),
         ("Postponed", "Won"),
         ("Postponed", "Lost with reason"),
         ("Postponed", "Lost Quotation"),
@@ -364,28 +371,85 @@ def ensure_wf_defaults():
 
 
 def _default_stage_sla_rules():
-    # (stage, days, notify, require_no_activity, label)
+    # (stage, days, notify, require_no_activity, label, repeat_every_days)
     return [
-        # WF-05 "Lead": two-stage reminder, per the customer's own revision
-        # (first reminder Day 3, second reminder 4 days after that = Day 7)
-        # — no separate "escalation" milestone specified for this stage.
-        ("Lead", 3, "Lead Owner", 1, "First reminder — no contact yet"),
-        ("Lead", 7, "Lead Owner", 1, "Second reminder — still no contact"),
-        # Interested: meeting expected within 3 days.
-        ("Interested", 3, "Lead Owner", 1, "Reminder — schedule/hold a meeting"),
-        ("Interested", 7, "Approver (Sales Manager)", 1, "Escalation — meeting not held"),
-        # Qualified lead: quotation expected within 5 days.
-        ("Qualified lead", 5, "Lead Owner", 1, "Reminder — quotation expected"),
-        ("Qualified lead", 10, "Approver (Sales Manager)", 1, "Escalation — quotation overdue"),
-        # Contract Under Signing: follow-up every 3 days, escalate Day 10,
-        # plus a dedicated Approver check-in on Day 4 (per the customer's
-        # own addition).
-        ("Contract Under Signing", 3, "Lead Owner", 1, "Follow-up"),
-        ("Contract Under Signing", 4, "Approver (Sales Manager)", 0, "Approver check-in"),
-        ("Contract Under Signing", 6, "Lead Owner", 1, "Follow-up"),
-        ("Contract Under Signing", 9, "Lead Owner", 1, "Follow-up"),
-        ("Contract Under Signing", 10, "Approver (Sales Manager)", 1, "Escalation — contract not signed"),
+        # WF-05 "Lead" (customer revision): first reminder Day 3, second reminder 4 days later (Day 7)
+        ("Lead", 3, "Lead Owner", 1, "First reminder — no contact yet", 0),
+        ("Lead", 7, "Lead Owner", 1, "Second reminder — still no contact", 0),
+        # Interested: meeting scheduled or held within 3 days
+        ("Interested", 3, "Lead Owner", 1, "Reminder — schedule/hold a meeting", 0),
+        ("Interested", 7, "Approver (Sales Manager)", 1, "Escalation — meeting not held", 0),
+        # Qualified lead: quotation expected within 5 days
+        ("Qualified lead", 5, "Lead Owner", 1, "Reminder — quotation expected", 0),
+        ("Qualified lead", 10, "Approver (Sales Manager)", 1, "Escalation — quotation overdue", 0),
+        # Contract Under Signing: follow-up every 3 days, approver on Day 4, escalation Day 10
+        ("Contract Under Signing", 3, "Lead Owner", 0, "Follow-up — contract under signing", 3),
+        ("Contract Under Signing", 4, "Approver (Sales Manager)", 0, "Approver check-in (day 4)", 0),
+        ("Contract Under Signing", 10, "Approver (Sales Manager)", 1, "Escalation — contract not signed", 0),
     ]
+
+
+_OLD_SLA_DEFAULTS = {("Lead", 3), ("Lead", 7), ("Interested", 3), ("Interested", 7), ("Qualified lead", 5),
+    ("Qualified lead", 10), ("Contract Under Signing", 3), ("Contract Under Signing", 4), ("Contract Under Signing", 6),
+    ("Contract Under Signing", 9), ("Contract Under Signing", 10)}
+_OLD_STAGE_MAP = {("lead", "qualified lead"), ("prospect", "quotation"), ("cold lead", "postponed"),
+    ("inactive lead", "lost with reason"), ("successful", "contract under signing"), ("customer", "won")}
+
+
+REPLACED_NOTIFICATIONS = ("AlphaX New Lead Alert", "AlphaX Follow-up Due")
+
+
+def retire_replaced_notifications():
+    """0.41: these two email immediately / at midnight, including weekends. They are replaced by
+    the business-hours notifier (crm/workflow.py: new_lead_alert, followup_due_daily)."""
+    for name in REPLACED_NOTIFICATIONS:
+        if frappe.db.get_value("Notification", name, "enabled"):
+            frappe.db.set_value("Notification", name, "enabled", 0)
+
+
+def _workflow_go_live_and_indexes():
+    """Go-live date: Leads already sitting at a stage without a logged transition start their SLA
+    clock here instead of at creation (no flood of overdue reminders on the first 08:00 run).
+    Composite index for the per-Lead stage-entry lookups the daily rules make."""
+    from alphax_crm.crm.automation import GO_LIVE_KEY
+
+    if not frappe.db.get_default(GO_LIVE_KEY):
+        frappe.db.set_default(GO_LIVE_KEY, frappe.utils.now())
+    try:
+        if frappe.db.table_exists("AlphaX Stage Transition Log"):
+            frappe.db.add_index("AlphaX Stage Transition Log", ["reference_name", "field_label", "changed_on"],
+                "alphax_stl_lookup")
+    except Exception:
+        frappe.log_error(title="AlphaX: transition log index")
+
+
+def upgrade_workflow_defaults():
+    """0.41: move sites still on the old seeded tables to the approved spec (mapping in both
+    directions, Quotation -> Lost Quotation transition, repeating Contract Under Signing follow-up).
+    Tables an admin has customised are left alone (the health check reports differences)."""
+    if not frappe.db.exists("DocType", "AlphaX CRM Settings"):
+        return
+    _workflow_go_live_and_indexes()
+    settings = frappe.get_single("AlphaX CRM Settings")
+    changed = False
+    rows = {((r.lead_status or "").lower(), (r.lead_stage or "").lower()) for r in settings.get("lead_stage_map") or []}
+    if not rows or rows == _OLD_STAGE_MAP:
+        settings.set("lead_stage_map", [{"lead_status": st, "lead_stage": stg} for st, stg in _default_lead_stage_map()])
+        changed = True
+    old_t = {(a.lower(), b.lower()) for a, b in _default_stage_transitions() if (a, b) != ("Quotation", "Lost Quotation")}
+    have_t = {((t.from_stage or "").lower(), (t.to_stage or "").lower()) for t in settings.get("stage_transitions") or []}
+    if have_t == old_t:
+        settings.append("stage_transitions", {"from_stage": "Quotation", "to_stage": "Lost Quotation"})
+        changed = True
+    have_s = {((r.stage or ""), int(r.days or 0)) for r in settings.get("stage_sla_rules") or []}
+    if have_s == _OLD_SLA_DEFAULTS:
+        settings.set("stage_sla_rules", [dict(zip(("stage", "days", "notify", "require_no_activity", "label",
+            "repeat_every_days"), r)) for r in _default_stage_sla_rules()])
+        changed = True
+    if changed:
+        settings.flags.ignore_permissions = True
+        settings.flags.ignore_mandatory = True
+        settings.save(ignore_permissions=True)
 
 
 def seed_stage_sla_rules():
@@ -403,10 +467,10 @@ def seed_stage_sla_rules():
     settings = frappe.get_single("AlphaX CRM Settings")
     if settings.get("stage_sla_rules"):
         return
-    for stage, days, notify, require_no_activity, label in _default_stage_sla_rules():
+    for stage, days, notify, require_no_activity, label, repeat in _default_stage_sla_rules():
         settings.append("stage_sla_rules", {
             "stage": stage, "days": days, "notify": notify,
-            "require_no_activity": require_no_activity, "label": label,
+            "require_no_activity": require_no_activity, "label": label, "repeat_every_days": repeat,
         })
     settings.flags.ignore_permissions = True
     settings.save(ignore_permissions=True)
@@ -546,10 +610,60 @@ def setup_custom_fields():
                 "insert_after": "alphax_ai_brief",
             },
             {
+                "fieldname": "alphax_ai_next_action",
+                "label": "AI Next Best Action",
+                "fieldtype": "Small Text",
+                "read_only": 1,
+                "insert_after": "alphax_ai_draft_reply",
+            },
+            {
+                "fieldname": "alphax_ai_next_action_date",
+                "label": "AI Next Action Date",
+                "fieldtype": "Date",
+                "read_only": 1,
+                "insert_after": "alphax_ai_next_action",
+            },
+            {
+                "fieldname": "alphax_ai_company_brief",
+                "label": "AI Company Brief (from website)",
+                "fieldtype": "Small Text",
+                "read_only": 1,
+                "insert_after": "alphax_ai_next_action_date",
+            },
+            {
+                "fieldname": "alphax_ai_intent",
+                "label": "AI: Last Client Email Intent",
+                "fieldtype": "Small Text",
+                "read_only": 1,
+                "insert_after": "alphax_ai_company_brief",
+            },
+            {
+                "fieldname": "alphax_ai_suggested_stage",
+                "label": "AI Suggested Stage (needs confirmation)",
+                "fieldtype": "Data",
+                "read_only": 1,
+                "insert_after": "alphax_ai_intent",
+            },
+            {
+                "fieldname": "alphax_proposed_action",
+                "label": "Proposed Action (awaiting confirmation)",
+                "fieldtype": "Small Text",
+                "read_only": 1,
+                "insert_after": "alphax_ai_suggested_stage",
+            },
+            {
+                "fieldname": "alphax_ai_last_run",
+                "label": "AI Last Run",
+                "fieldtype": "Datetime",
+                "read_only": 1,
+                "hidden": 1,
+                "insert_after": "alphax_proposed_action",
+            },
+            {
                 "fieldname": "alphax_inbound_message",
                 "label": "Inbound Message",
                 "fieldtype": "Small Text",
-                "insert_after": "alphax_ai_draft_reply",
+                "insert_after": "alphax_ai_last_run",
             },
             {
                 "fieldname": "alphax_pdpl_section",
@@ -874,6 +988,68 @@ def setup_accounting_dimensions():
 # ---------------------------------------------------------------------------
 # Default settings + starter score rules
 # ---------------------------------------------------------------------------
+# Defaults for the AI settings added in 0.40. A Single doctype does not get new field
+# defaults on migrate, so set each one only when it has never been stored.
+AI_DEFAULTS = {
+    "ai_max_output_tokens": 1500,
+    "ai_brand_voice": "Professional, concise, helpful",
+    "ai_mask_pii": 1,
+    "ai_daily_token_budget": 0,
+    "ai_log_enabled": 1,
+    "ai_log_retention_days": 90,
+    "ai_writing_enabled": 1,
+    "ai_spellcheck_mode": "Suggest",
+    "ai_spell_min_chars": 4,
+    "ai_writing_timeout": 30,
+    "ai_daily_batch": 100,
+    "ai_next_action_todo": 0,
+    "ai_intent_detection": 1,
+    "business_days": "Sunday\nMonday\nTuesday\nWednesday\nThursday",
+    "business_start": "08:00:00",
+    "business_end": "17:00:00",
+    "working_hours_mode": "Working days (24h per day)",
+    "business_hours_only": 1,
+    "notify_by_email": 1,
+    "protect_lead_stage": 1,
+    "wf_quotation_check_enabled": 1,
+    "wf02_reminder_hours": 24,
+    "wf02_escalation_hours": 72,
+    "notify_approvers_on_quotation_create": 1,
+    "wf03_confirmation_enabled": 1,
+    "wf03_require_valid_till": 1,
+    "wf03_move_lead_to_quotation": 1,
+    "wf04_enabled": 1,
+    "wf04_days_before": 2,
+    "wf04_escalate_days_after": 3,
+    "wf04_ai_draft": 1,
+    "postponed_require_next_contact": 1,
+    "cus_expected_close_alert": 1,
+    "ai_followup_cadence": "2,5,10",
+    "ai_email_language": "English",
+    "ai_stop_sequence_on_reply": 1,
+    "ai_quotation_watch": 0,
+    "ai_quotation_reminder_days": 3,
+}
+
+
+def ensure_ai_defaults():
+    settings_dt = "AlphaX CRM Settings"
+    meta = frappe.get_meta(settings_dt)
+    stored = set(frappe.db.sql_list("select field from `tabSingles` where doctype=%s", settings_dt))
+    for field, value in AI_DEFAULTS.items():
+        if meta.has_field(field) and field not in stored:
+            frappe.db.set_single_value(settings_dt, field, value)
+    for field in ("ai_writing_doctypes", "ai_writing_data_fields"):
+        df = meta.get_field(field)
+        if df and field not in stored and df.default:
+            frappe.db.set_single_value(settings_dt, field, df.default)
+    if meta.has_field("ai_provider") and not frappe.db.get_single_value(settings_dt, "ai_provider"):
+        path = frappe.db.get_single_value(settings_dt, "ai_chat_path") or ""
+        frappe.db.set_single_value(settings_dt, "ai_provider",
+            "OpenAI Compatible" if "chat/completions" in path else "Ollama")
+    frappe.clear_document_cache(settings_dt, settings_dt)
+
+
 def seed_default_settings():
     doc = frappe.get_single("AlphaX CRM Settings")
     if doc.get("score_rules"):
@@ -1022,16 +1198,19 @@ def seed_prospect_statuses():
 
 
 def _default_lead_stage_map():
-    # Confirmed 1:1 with the customer, mapping the coarse "Lead Status"
-    # bucket (custom_lead_status, added on the live site via Customize
-    # Form) to the "Lead Stage" shown over the native Status field.
+    # Approved spec, section A: Lead Stage -> Lead Status (custom_lead_status), as
+    # (lead_status, lead_stage) rows. The sync works both ways (crm/workflow.py): a stage change sets
+    # the status; a status change picks the matching stage (keeping the current one when it fits).
     return [
+        ("Lead", "Lead"),
+        ("Lead", "Interested"),
         ("Lead", "Qualified lead"),
         ("Prospect", "Quotation"),
         ("Cold Lead", "Postponed"),
-        ("Inactive Lead", "Lost with reason"),
         ("Successful", "Contract Under Signing"),
         ("Customer", "Won"),
+        ("Inactive Lead", "Lost with reason"),
+        ("Inactive Lead", "Lost Quotation"),
     ]
 
 
@@ -1203,6 +1382,7 @@ def ensure_whatsapp_defaults():
 
 
 def setup_notifications():
+    _ensure_reviewer_role()  # the review notification below needs it; missing on new sites
     _ensure_notification(
         name="AlphaX New Lead Alert",
         subject="AlphaX: New lead {{ doc.lead_name }} (score {{ doc.alphax_lead_score }})",

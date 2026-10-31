@@ -8,6 +8,7 @@
  "field_order": [
   "stage",
   "days",
+  "repeat_every_days",
   "notify",
   "require_no_activity",
   "label"
@@ -32,14 +33,22 @@
    "reqd": 1
   },
   {
+   "columns": 1,
+   "description": "0 = once. e.g. 3 = again every 3 days while the Lead stays in the stage",
+   "fieldname": "repeat_every_days",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Repeat Every (days)"
+  },
+  {
    "columns": 3,
+   "default": "Lead Owner",
    "fieldname": "notify",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Notify",
    "options": "Lead Owner\nApprover (Sales Manager)\nBoth",
-   "reqd": 1,
-   "default": "Lead Owner"
+   "reqd": 1
   },
   {
    "columns": 2,
@@ -52,7 +61,7 @@
   },
   {
    "columns": 4,
-   "description": "Shown in the notification subject/timeline comment, e.g. \"First contact reminder\", \"Escalation — quotation overdue\".",
+   "description": "Shown in the notification subject/timeline comment, e.g. \"First contact reminder\", \"Escalation \u2014 quotation overdue\".",
    "fieldname": "label",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -62,7 +71,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-30 00:00:00.000000",
+ "modified": "2026-10-28 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "AlphaX CRM",
  "name": "AlphaX Lead Stage SLA",

@@ -308,42 +308,24 @@ def _answer_prompt(question, capability, result):
     return system, user
 
 
-def _chat(system, user, settings, expect_json=False):
-    """Same transport as api/ai.py's _chat — duplicated locally (rather than
-    imported) because that one is private to the lead/opportunity pipeline
-    and this module's calling convention differs slightly (it always needs
-    the raw text back, never writes straight to a doctype field)."""
-    base = (settings.ai_base_url or "http://localhost:11434").rstrip("/")
-    model = settings.ai_model or "llama3.2:3b"
-    url = f"{base}{settings.ai_chat_path or '/api/chat'}"
+def _chat(system, user, settings, expect_json=False, feature="ask_ai"):
+    """Model call through the AlphaX AI engine (governed + logged)."""
+    from alphax_crm.ai.engine import complete
 
-    import requests
+    return complete(system, user, feature=feature, want_json=expect_json, temperature=0.1)
 
-    body = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "stream": False,
-        "options": {"temperature": 0.1},
-    }
-    if expect_json:
-        body["format"] = "json"
-    headers = ai_request_headers(settings)
 
-    resp = requests.post(url, json=body, headers=headers, timeout=settings.ai_timeout or 60)
-    resp.raise_for_status()
-    data = resp.json()
-    if "message" in data:
-        return data["message"]["content"]
-    if "choices" in data:
-        return data["choices"][0]["message"]["content"]
-    return json.dumps(data)
+def _language(question, language):
+    """'Arabic' / 'English' for the answer; Auto follows the language of the question."""
+    from alphax_crm.ai.pure import detect_language
+
+    if language in ("Arabic", "English"):
+        return language
+    return detect_language(question or "")
 
 
 @frappe.whitelist()
-def ask(question, context_doctype=None, context_name=None):
+def ask(question, context_doctype=None, context_name=None, language=None):
     if frappe.session.user == "Guest":
         frappe.throw(_("Please log in"), frappe.AuthenticationError)
     settings = get_settings()
@@ -354,34 +336,41 @@ def ask(question, context_doctype=None, context_name=None):
     if context_doctype and context_name and frappe.has_permission(context_doctype, "read", context_name):
         context = f"{context_doctype} {context_name}"
 
+    from alphax_crm.ai.engine import language_instruction
+    from alphax_crm.ai.pure import extract_json
+
+    lang = _language(question, language)
+    lang_rule = language_instruction(lang)
     system, user = _plan_prompt(question, context)
+    system += f"\nIf you answer directly, {lang_rule[0].lower() + lang_rule[1:]}"
     try:
-        raw = _chat(system, user, settings, expect_json=True)
-        plan = json.loads(raw)
+        raw = _chat(system, user, settings, expect_json=True, feature="ask_ai_plan")
+        plan = extract_json(raw)
     except Exception:
         log_error("ai assistant: plan")
-        return {"answer": str(_("Sorry, I couldn't reach the AI server just now. Check AI Assist in Settings.")), "table": None, "chart": None}
+        return {"language": lang, "answer": str(_("Sorry, I couldn't reach the AI server just now. Check AI Assist in Settings.")), "table": None, "chart": None}
 
     capability = plan.get("capability")
     if capability == "none" or capability not in CAPABILITIES:
-        return {"answer": plan.get("answer") or str(_("I'm not sure how to answer that from CRM data.")), "table": None, "chart": None}
+        return {"language": lang, "answer": plan.get("answer") or str(_("I'm not sure how to answer that from CRM data.")), "table": None, "chart": None}
 
     try:
         result = CAPABILITIES[capability](plan.get("params") or {})
     except frappe.PermissionError:
-        return {"answer": str(_("You don't have permission to see that data.")), "table": None, "chart": None}
+        return {"language": lang, "answer": str(_("You don't have permission to see that data.")), "table": None, "chart": None}
     except Exception:
         log_error("ai assistant: capability")
-        return {"answer": str(_("Something went wrong running that query.")), "table": None, "chart": None}
+        return {"language": lang, "answer": str(_("Something went wrong running that query.")), "table": None, "chart": None}
 
     try:
         ans_system, ans_user = _answer_prompt(question, capability, result)
-        answer_text = _chat(ans_system, ans_user, settings, expect_json=False)
+        answer_text = _chat(ans_system + "\n" + lang_rule, ans_user, settings, expect_json=False, feature="ask_ai_answer")
     except Exception:
         log_error("ai assistant: summarize")
         answer_text = str(_("Here's what I found (couldn't reach the AI server to summarize it):"))
 
     return {
+        "language": lang,
         "answer": answer_text,
         "table": {"columns": result["columns"], "rows": result["rows"]} if result.get("rows") else None,
         "chart": result.get("chart"),

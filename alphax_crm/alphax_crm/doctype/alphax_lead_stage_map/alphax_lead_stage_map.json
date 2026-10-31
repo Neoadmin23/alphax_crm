@@ -12,7 +12,7 @@
  "fields": [
   {
    "columns": 5,
-   "description": "Value of the \"Lead Status\" field (custom_lead_status) that triggers this mapping.",
+   "description": "Lead Status (custom_lead_status) set when the Lead enters this stage",
    "fieldname": "lead_status",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -21,7 +21,7 @@
   },
   {
    "columns": 5,
-   "description": "\"Lead Stage\" (the native Status field) to set automatically.",
+   "description": "Lead Stage (status field). Each stage appears once.",
    "fieldname": "lead_stage",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -32,7 +32,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-20 00:00:00.000000",
+ "modified": "2026-10-28 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "AlphaX CRM",
  "name": "AlphaX Lead Stage Map",

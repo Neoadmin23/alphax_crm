@@ -29,21 +29,27 @@ def process_followup(doc):
     if not frappe.db.exists(ref_dt, ref_name):
         return
 
+    # System placeholders (e.g. the blank follow-up created when a Lead is postponed) are not a
+    # contact with the client: no timeline communication, no "last activity" stamp.
+    system = bool(doc.flags.get("alphax_system"))
+
     # 1) Thread a Communication so the touch shows in the timeline history.
-    _log_communication(doc)
+    if not system:
+        _log_communication(doc)
 
     # 2) Stamp last activity (who/what/when) + reset idle.
-    try:
-        from alphax_crm.crm.activity import record_activity
+    if not system:
+        try:
+            from alphax_crm.crm.activity import record_activity
 
-        atype = f"{doc.channel} ({doc.direction})" if doc.direction else doc.channel
-        if doc.meeting_type:
-            atype = f"{atype} · {doc.meeting_type}"
-        if doc.outcome:
-            atype = f"{atype} · {doc.outcome}"
-        record_activity(ref_dt, ref_name, atype, doc.agent, (doc.summary or "")[:180])
-    except Exception:
-        frappe.log_error(title="AlphaX CRM: followup activity", message=frappe.get_traceback())
+            atype = f"{doc.channel} ({doc.direction})" if doc.direction else doc.channel
+            if doc.meeting_type:
+                atype = f"{atype} · {doc.meeting_type}"
+            if doc.outcome:
+                atype = f"{atype} · {doc.outcome}"
+            record_activity(ref_dt, ref_name, atype, doc.agent, (doc.summary or "")[:180])
+        except Exception:
+            frappe.log_error(title="AlphaX CRM: followup activity", message=frappe.get_traceback())
 
     # 3) Push the next follow-up date onto the parent record.
     if doc.next_follow_up_date:

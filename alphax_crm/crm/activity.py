@@ -69,6 +69,9 @@ def on_communication(doc, method=None):
         return
     if not frappe.db.exists(ref_dt, ref_name):
         return
+    # Automated messages (AlphaX reminders logged on the timeline) are not sales activity.
+    if doc.get("communication_type") not in (None, "Communication"):
+        return
 
     medium = doc.get("communication_medium")
     activity_type = {"Email": "Email", "Phone": "Call", "Chat": "WhatsApp / Chat", "SMS": "SMS"}.get(
@@ -113,6 +116,9 @@ def on_comment(doc, method=None):
     if not frappe.db.exists(ref_dt, ref_name):
         return
     summary = frappe.utils.strip_html(doc.get("content") or "")[:180]
+    # AlphaX's own system notes ("AlphaX: ...", "AlphaX SLA: ...") are not user activity.
+    if summary.strip().startswith(("AlphaX", "[AlphaX")):
+        return
     record_activity(ref_dt, ref_name, "Comment", doc.get("owner"), summary)
 
 

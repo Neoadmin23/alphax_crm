@@ -1,0 +1,104 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-10-28 15:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "term",
+  "keep_as_is",
+  "column_break_t",
+  "english",
+  "arabic"
+ ],
+ "fields": [
+  {
+   "description": "A word or phrase as your team writes it (any language)",
+   "fieldname": "term",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Term",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "0",
+   "description": "Brand, product, company or place names",
+   "fieldname": "keep_as_is",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Keep As Is (never translate or correct)"
+  },
+  {
+   "fieldname": "column_break_t",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:!doc.keep_as_is",
+   "description": "Preferred English wording, used when translating to English",
+   "fieldname": "english",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "English"
+  },
+  {
+   "depends_on": "eval:!doc.keep_as_is",
+   "description": "Preferred Arabic wording, used when translating to Arabic",
+   "fieldname": "arabic",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Arabic"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-28 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AlphaX CRM",
+ "name": "AlphaX AI Term",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "share": 1,
+   "write": 0
+  }
+ ],
+ "quick_entry": 1,
+ "search_fields": "term,english,arabic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "term"
+}
