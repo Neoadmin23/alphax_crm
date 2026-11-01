@@ -35,7 +35,7 @@ import json
 import frappe
 from frappe import _
 
-from alphax_crm.crm.utils import ai_request_headers, get_settings, log_error
+from alphax_crm.crm.utils import get_settings, log_error
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +346,11 @@ def ask(question, context_doctype=None, context_name=None, language=None):
     try:
         raw = _chat(system, user, settings, expect_json=True, feature="ask_ai_plan")
         plan = extract_json(raw)
-    except Exception:
+    except Exception as e:
+        from alphax_crm.ai.engine import AIBlocked
+
+        if isinstance(e, AIBlocked):
+            return {"language": lang, "answer": str(e), "table": None, "chart": None}
         log_error("ai assistant: plan")
         return {"language": lang, "answer": str(_("Sorry, I couldn't reach the AI server just now. Check AI Assist in Settings.")), "table": None, "chart": None}
 

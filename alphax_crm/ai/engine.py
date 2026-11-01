@@ -37,6 +37,10 @@ from alphax_crm.crm.utils import ai_request_headers, get_settings
 
 LOG_DT = "AlphaX AI Log"
 PROVIDERS = ("Ollama", "OpenAI Compatible")
+# AI that runs on its own (no person reviews the call as it happens) or that picks actions (Ask AI planner).
+# These need a model that passed the self-test; a model that Failed is kept away from them.
+AUTOMATIC_FEATURES = {"lead_classify", "lead_next_action", "intent_detection", "quotation_reminder",
+	"lead_followup_email", "lead_website_research", "ask_ai_plan"}
 
 
 class AIError(Exception):
@@ -45,6 +49,10 @@ class AIError(Exception):
 
 class AIBlocked(AIError):
 	"""Governance stopped the call before it was sent."""
+
+
+class AIServerError(AIError):
+	"""The AI server, tunnel or gateway failed (says nothing about the model's quality)."""
 
 
 # ----------------------------------------------------------------------------- settings
@@ -96,8 +104,8 @@ def complete(system: str, user: str, *, feature: str = "adhoc", reference=None, 
 	started = time.monotonic()
 	masks = {}
 	try:
-		_check_governance(settings)
-		if cint(settings.get("ai_mask_pii")):
+		free = _check_governance(settings, feature, model)
+		if cint(settings.get("ai_mask_pii")) or free:
 			system, masks = pure.mask_pii(system, masks)
 			user, masks = pure.mask_pii(user, masks)
 		if cint(settings.get("ai_log_excerpts")):
@@ -119,7 +127,7 @@ def complete(system: str, user: str, *, feature: str = "adhoc", reference=None, 
 		raise
 	except requests.RequestException as e:
 		log.update(status="Failed", error=str(e)[:500])
-		raise AIError(_("Could not reach the AI server: {0}").format(str(e)[:300])) from e
+		raise AIServerError(_("Could not reach the AI server: {0}").format(str(e)[:300])) from e
 	finally:
 		log["latency_ms"] = int((time.monotonic() - started) * 1000)
 		_write_log(settings, log)
@@ -135,9 +143,24 @@ def complete_json(system: str, user: str, *, schema: dict | None = None, **kwarg
 
 
 # ----------------------------------------------------------------------------- governance
-def _check_governance(settings):
+def _check_governance(settings, feature=None, model=None):
+	"""Raise AIBlocked when the call must not go out. Returns True when the model is a free hosted tier
+	(the caller then always masks PII)."""
+	from alphax_crm.ai import catalogue
+
 	if not cint(settings.ai_enabled):
 		raise AIBlocked(_("AI Assist is disabled. Enable it in AlphaX CRM Settings."))
+	model = model or settings.ai_model
+	free = catalogue.is_free_tier(chat_url(settings), model)
+	if free and cint(settings.get("ai_residency_mode")):
+		raise AIBlocked(_("KSA Data Residency Mode is on and {0} is a free hosted tier, which is always External "
+			"(its hosts may keep or train on prompts). Use a self-hosted model.").format(model))
+	if feature in AUTOMATIC_FEATURES and model == settings.ai_model:
+		from alphax_crm.ai.models import status_of
+
+		if status_of(settings, "main") == "Failed":
+			raise AIBlocked(_("Model {0} failed the AlphaX self-test, so automatic AI is paused. Run Test Model in "
+				"AlphaX CRM Settings after changing the model or server.").format(model))
 	if cint(settings.get("ai_residency_mode")):
 		host = urlparse(chat_url(settings)).hostname or ""
 		allowed = (settings.get("ai_allowed_hosts") or "").splitlines()
@@ -152,6 +175,7 @@ def _check_governance(settings):
 		if used >= budget:
 			raise AIBlocked(_("Today's AI usage limit ({0} tokens) is used up. AI features resume tomorrow.")
 				.format(budget))
+	return free
 
 
 # ----------------------------------------------------------------------------- providers
@@ -207,7 +231,10 @@ def _post(url, payload, headers, timeout, retry_without=None, retry_value=None):
 			payload.pop(retry_without)
 		resp = requests.post(url, data=json.dumps(payload), headers=headers, timeout=timeout)
 	if resp.status_code >= 400:
-		raise AIError(_("AI server returned HTTP {0}: {1}").format(resp.status_code, resp.text[:300]))
+		from alphax_crm.ai import catalogue
+
+		msg = _("AI server error: {0}").format(catalogue.http_error_summary(resp.status_code, resp.text[:3000]))
+		raise (AIServerError if catalogue.is_server_problem(resp.status_code) else AIError)(msg)
 	try:
 		return resp.json()
 	except ValueError as e:

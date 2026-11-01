@@ -9,6 +9,31 @@ class AlphaXCRMSettings(Document):
         if self.ai_enabled and not self.ai_base_url:
             frappe.throw("AI Base URL is required when AI Assist is enabled.")
         self._check_ai_residency()
+        self._ai_model_state()
+
+    def _ai_model_state(self):
+        """Self-test results belong to one server + model: any change resets them to Not tested.
+        Free-tier hosted models are flagged (always External)."""
+        from alphax_crm.ai import catalogue, engine
+        from alphax_crm.ai.models import STATUS_FIELDS
+
+        if not self.meta.has_field("ai_selftest_status"):
+            return
+        prov = engine.provider(self)
+        for model_f, status_f, details_f, on_f, fp_f in STATUS_FIELDS.values():
+            fp = catalogue.fingerprint(prov, self.ai_base_url, self.ai_chat_path, self.get(model_f))
+            if self.get(fp_f) and self.get(fp_f) != fp or not self.get(model_f):
+                self.set(status_f, "Not tested")
+                self.set(details_f, "")
+                self.set(on_f, None)
+                self.set(fp_f, "")
+        free = any(catalogue.is_free_tier(self.ai_base_url, self.get(f)) for f in ("ai_model", "ai_fast_model"))
+        self.ai_free_tier = 1 if free else 0
+        if free and self.get("ai_enabled") and self.get("ai_residency_mode"):
+            frappe.msgprint(
+                frappe._("A free-tier hosted model is selected. Free tiers are always External, so KSA Data Residency "
+                    "Mode blocks every AI call while it is selected."),
+                title=frappe._("Free-tier model is External"), indicator="orange")
 
     def _check_ai_residency(self):
         """Warn (not block) when KSA Data Residency Mode would refuse the configured AI server."""

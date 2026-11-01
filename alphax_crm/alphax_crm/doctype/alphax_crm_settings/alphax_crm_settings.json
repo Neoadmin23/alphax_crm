@@ -129,6 +129,7 @@
   "notify_by_email",
   "ai_section",
   "ai_enabled",
+  "ai_preset",
   "ai_provider",
   "ai_base_url",
   "ai_chat_path",
@@ -136,6 +137,7 @@
   "ai_api_key",
   "ai_timeout",
   "ai_fast_model",
+  "ai_model_info",
   "ai_max_output_tokens",
   "ai_disable_thinking",
   "ai_col",
@@ -146,6 +148,17 @@
   "ai_intent_detection",
   "ai_company_profile",
   "ai_brand_voice",
+  "ai_selftest_section",
+  "ai_selftest_status",
+  "ai_selftest_on",
+  "ai_selftest_details",
+  "ai_selftest_fingerprint",
+  "ai_selftest_col",
+  "ai_fast_selftest_status",
+  "ai_fast_selftest_on",
+  "ai_fast_selftest_details",
+  "ai_fast_selftest_fingerprint",
+  "ai_free_tier",
   "ai_server_setup_section",
   "ai_server_setup_help",
   "ai_setup_token",
@@ -263,7 +276,7 @@
    "options": "Warn\nBlock"
   },
   {
-   "description": "Require selected fields to be filled and correct before a lead is qualified/converted \u2014 even non-mandatory fields.",
+   "description": "Require selected fields to be filled and correct before a lead is qualified/converted — even non-mandatory fields.",
    "fieldname": "dq_section",
    "fieldtype": "Section Break",
    "label": "Data Quality Gate"
@@ -285,7 +298,7 @@
   {
    "default": "Lead",
    "depends_on": "eval:doc.dq_enforce_on!=\"On Save\"",
-   "description": "Comma-separated Lead status value(s). Under 'Qualify or Convert' (or 'Both'), the gate fires when status is changing away from one of these \u2014 not into a specific status \u2014 so it works with any custom status list, including this site's own (Lead, Interested, Qualified lead, Proposal sent, Won, ...). Default 'Lead' means: nothing else here matters if you never leave the initial status, but complete data is required the moment you try to move it anywhere else.",
+   "description": "Comma-separated Lead status value(s). Under 'Qualify or Convert' (or 'Both'), the gate fires when status is changing away from one of these — not into a specific status — so it works with any custom status list, including this site's own (Lead, Interested, Qualified lead, Proposal sent, Won, ...). Default 'Lead' means: nothing else here matters if you never leave the initial status, but complete data is required the moment you try to move it anywhere else.",
    "fieldname": "dq_gate_from_statuses",
    "fieldtype": "Small Text",
    "label": "Gate When Leaving Status"
@@ -324,7 +337,7 @@
   {
    "fieldname": "prospect_section",
    "fieldtype": "Section Break",
-   "label": "PreLead \u2192 Lead"
+   "label": "PreLead → Lead"
   },
   {
    "default": "1",
@@ -370,7 +383,7 @@
   },
   {
    "default": "1",
-   "description": "When the \"Lead Status\" field (Lead / Prospect / Cold Lead / Inactive Lead / Successful / Customer) changes, automatically set \"Lead Stage\" (the native Status field) using the mapping below \u2014 instead of relying on a human to remember to update both.",
+   "description": "When the \"Lead Status\" field (Lead / Prospect / Cold Lead / Inactive Lead / Successful / Customer) changes, automatically set \"Lead Stage\" (the native Status field) using the mapping below — instead of relying on a human to remember to update both.",
    "fieldname": "auto_set_stage_from_status",
    "fieldtype": "Check",
    "label": "Auto-set Lead Stage from Lead Status"
@@ -389,11 +402,11 @@
   {
    "fieldname": "lead_stage_map",
    "fieldtype": "Table",
-   "label": "Lead Status \u2192 Lead Stage Mapping",
+   "label": "Lead Status → Lead Stage Mapping",
    "options": "AlphaX Lead Stage Map"
   },
   {
-   "description": "Stages cannot be skipped \u2014 a Lead Stage change is only allowed to save if it matches one of the From \u2192 To pairs below. Add, remove or rename rows freely; an empty table turns this check off entirely (nothing is enforced until at least one row exists).",
+   "description": "Stages cannot be skipped — a Lead Stage change is only allowed to save if it matches one of the From → To pairs below. Add, remove or rename rows freely; an empty table turns this check off entirely (nothing is enforced until at least one row exists).",
    "fieldname": "stage_flow_section",
    "fieldtype": "Section Break",
    "label": "Stage Progression Control (WF-01)"
@@ -407,7 +420,7 @@
   {
    "fieldname": "stage_transitions",
    "fieldtype": "Table",
-   "label": "Approved Transitions (From \u2192 To)",
+   "label": "Approved Transitions (From → To)",
    "options": "AlphaX Lead Stage Transition"
   },
   {
@@ -416,7 +429,7 @@
   },
   {
    "default": "System Manager,Sales Manager",
-   "description": "Anyone holding one of these roles can move a Lead to any stage directly \u2014 for correcting a mistake, or an exception the approved flow doesn't cover.",
+   "description": "Anyone holding one of these roles can move a Lead to any stage directly — for correcting a mistake, or an exception the approved flow doesn't cover.",
    "fieldname": "stage_flow_bypass_roles",
    "fieldtype": "Small Text",
    "label": "Roles That Can Bypass (comma separated)"
@@ -441,7 +454,7 @@
    "label": "Alert When Expected Closing Date Passes (Contract Under Signing)"
   },
   {
-   "description": "A Lead cannot be saved at the \"Won\" or a \"Lost\" stage until its required closure fields (Contract, Won Or Lost Date, and \u2014 for a Lost stage \u2014 Lost Reason and Detailed Reason, the same fields the Lead form itself shows for that stage) are filled in.",
+   "description": "A Lead cannot be saved at the \"Won\" or a \"Lost\" stage until its required closure fields (Contract, Won Or Lost Date, and — for a Lost stage — Lost Reason and Detailed Reason, the same fields the Lead form itself shows for that stage) are filled in.",
    "fieldname": "closure_section",
    "fieldtype": "Section Break",
    "label": "Closure Controls (WF-06)"
@@ -482,7 +495,7 @@
    "label": "Require Linked Customer for Won"
   },
   {
-   "description": "\"Approver\" throughout this app's automation means whoever holds this role \u2014 change it here once rather than in five different places.",
+   "description": "\"Approver\" throughout this app's automation means whoever holds this role — change it here once rather than in five different places.",
    "fieldname": "wf_section",
    "fieldtype": "Section Break",
    "label": "Approvals & Quotation Notifications (WF-02, WF-03)"
@@ -524,7 +537,7 @@
   },
   {
    "default": "1",
-   "description": "ERPNext core resets a Lead's status to \"Quotation\" every time its linked Quotation is submitted, cancelled, or declared Lost (via Quotation's own \"Set as Lost\") \u2014 core has no concept of this app's Lost Quotation/Lost with reason/Won stages, so it silently overwrites whichever one was just set. When this is on, AlphaX CRM corrects the Lead's Lead Stage back to the \"Lost Quotation\" value above immediately after a linked Quotation turns Lost or is cancelled.",
+   "description": "ERPNext core resets a Lead's status to \"Quotation\" every time its linked Quotation is submitted, cancelled, or declared Lost (via Quotation's own \"Set as Lost\") — core has no concept of this app's Lost Quotation/Lost with reason/Won stages, so it silently overwrites whichever one was just set. When this is on, AlphaX CRM corrects the Lead's Lead Stage back to the \"Lost Quotation\" value above immediately after a linked Quotation turns Lost or is cancelled.",
    "fieldname": "guard_quotation_lead_stage",
    "fieldtype": "Check",
    "label": "Guard Lead Stage Against Quotation Status Sync"
@@ -612,7 +625,7 @@
    "label": "Send Daily Lost-Quotation Digest to Approvers"
   },
   {
-   "description": "One row per reminder or escalation milestone. \"Days In Stage\" counts from when the Lead most recently entered that Stage. Add as many rows per stage as needed (e.g. a first reminder, a second reminder, then an escalation to the Approver) \u2014 nothing here is hardcoded to a fixed day count.",
+   "description": "One row per reminder or escalation milestone. \"Days In Stage\" counts from when the Lead most recently entered that Stage. Add as many rows per stage as needed (e.g. a first reminder, a second reminder, then an escalation to the Approver) — nothing here is hardcoded to a fixed day count.",
    "fieldname": "stage_sla_section",
    "fieldtype": "Section Break",
    "label": "Stage Activity Monitoring / SLA (WF-05)"
@@ -685,7 +698,7 @@
    "label": "Add Active Accounting Dimensions to CRM Documents"
   },
   {
-   "description": "Add extra fields (e.g. dimensions like Cost Center / Business Unit, or Territory) to show as columns and be available as filters in the Activity Monitor reports \u2014 no code needed.",
+   "description": "Add extra fields (e.g. dimensions like Cost Center / Business Unit, or Territory) to show as columns and be available as filters in the Activity Monitor reports — no code needed.",
    "fieldname": "report_fields_section",
    "fieldtype": "Section Break",
    "label": "Report Fields & Filters"
@@ -700,7 +713,7 @@
    "description": "Smart Lead is the clean entry screen; on save it maps into the ERPNext Lead using the field map below.",
    "fieldname": "smart_lead_section",
    "fieldtype": "Section Break",
-   "label": "Smart Lead \u2192 ERPNext Lead"
+   "label": "Smart Lead → ERPNext Lead"
   },
   {
    "default": "1",
@@ -711,7 +724,7 @@
   {
    "fieldname": "smart_lead_map",
    "fieldtype": "Table",
-   "label": "Field Map (Smart Lead \u2192 Lead)",
+   "label": "Field Map (Smart Lead → Lead)",
    "options": "AlphaX Smart Lead Map"
   },
   {
@@ -824,7 +837,7 @@
    "options": "Text\nTemplate"
   },
   {
-   "default": "\u0634\u0643\u0631\u064b\u0627 \u0644\u062a\u0648\u0627\u0635\u0644\u0643 \u0645\u0639 AlphaX. \u0633\u064a\u062a\u0648\u0627\u0635\u0644 \u0645\u0639\u0643 \u0623\u062d\u062f \u0645\u0645\u062b\u0644\u064a\u0646\u0627 \u0642\u0631\u064a\u0628\u064b\u0627.\nThank you for contacting AlphaX. One of our representatives will reach out shortly.",
+   "default": "شكرًا لتواصلك مع AlphaX. سيتواصل معك أحد ممثلينا قريبًا.\nThank you for contacting AlphaX. One of our representatives will reach out shortly.",
    "fieldname": "whatsapp_ack_text",
    "fieldtype": "Small Text",
    "label": "Acknowledgment Text"
@@ -971,10 +984,11 @@
    "label": "Chat Path"
   },
   {
-   "default": "llama3.1",
+   "default": "qwen3.8:27b",
    "fieldname": "ai_model",
    "fieldtype": "Data",
-   "label": "Model"
+   "label": "Model",
+   "description": "Use Find Models on Server or Open Models Guide to fill this in."
   },
   {
    "fieldname": "ai_api_key",
@@ -988,7 +1002,7 @@
    "label": "Timeout (s)"
   },
   {
-   "description": "Optional smaller model for spell check and translation, e.g. qwen3.5-9b. Empty = use Model",
+   "description": "Optional smaller model for spell check and translation, e.g. gemma4:e4b. Empty = use Model. A Fast Model that fails the self-test is not used.",
    "fieldname": "ai_fast_model",
    "fieldtype": "Data",
    "label": "Fast Model (writing tools)"
@@ -1061,7 +1075,7 @@
   {
    "fieldname": "ai_server_setup_help",
    "fieldtype": "HTML",
-   "options": "<div class='text-muted small'>Install a free, local AI model (Ollama) once on a shared office PC/server, then every AlphaX CRM user gets AI Assist through it \u2014 no data leaves your network to a third-party AI vendor. Pick your server's operating system below to download a ready-to-run setup script: it installs Ollama, lets you choose a model size, and opens a secure tunnel so this site can reach it. When the script finishes it fills in AI Base URL and Model above on its own \u2014 nothing to copy or paste. Save this form once, then use Test AI Connection to confirm it works."
+   "options": "<div class='text-muted small'>Install a free, local AI model (Ollama) once on a shared office PC/server, then every AlphaX CRM user gets AI Assist through it — no data leaves your network to a third-party AI vendor. Pick your server's operating system below to download a ready-to-run setup script: it installs Ollama, lets you choose a model size, and opens a secure tunnel so this site can reach it. When the script finishes it fills in AI Base URL and Model above on its own — nothing to copy or paste. Save this form once, then use Test AI Connection to confirm it works."
   },
   {
    "fieldname": "ai_setup_token",
@@ -1072,7 +1086,7 @@
   },
   {
    "collapsible": 1,
-   "description": "Optional, for production use once the quick tunnel above has proven the setup works. A quick tunnel (*.trycloudflare.com) is a plain, unauthenticated public URL that changes every restart \u2014 fine to get started, not something to leave running long-term. A named Cloudflare Tunnel keeps a fixed address, and putting it behind Cloudflare Access with a Service Token means Cloudflare rejects every request at its edge \u2014 before it ever reaches your machine \u2014 unless it carries the two secret headers below. No one browsing to the tunnel URL directly can reach your AI server; only this CRM, using these credentials, can.",
+   "description": "Optional, for production use once the quick tunnel above has proven the setup works. A quick tunnel (*.trycloudflare.com) is a plain, unauthenticated public URL that changes every restart — fine to get started, not something to leave running long-term. A named Cloudflare Tunnel keeps a fixed address, and putting it behind Cloudflare Access with a Service Token means Cloudflare rejects every request at its edge — before it ever reaches your machine — unless it carries the two secret headers below. No one browsing to the tunnel URL directly can reach your AI server; only this CRM, using these credentials, can.",
    "fieldname": "ai_cf_access_section",
    "fieldtype": "Section Break",
    "label": "Secure Remote Access (Named Tunnel + Cloudflare Access)"
@@ -1080,7 +1094,7 @@
   {
    "fieldname": "ai_cf_access_help",
    "fieldtype": "HTML",
-   "options": "<div class='text-muted small'><b>One-time setup, on the machine running Ollama and in the Cloudflare dashboard:</b><ol style='padding-left:18px;margin-bottom:0;'><li>Add a domain to Cloudflare (free plan is fine) if you haven't already.</li><li><code>cloudflared tunnel login</code>, then <code>cloudflared tunnel create alphax-ollama</code>.</li><li><code>cloudflared tunnel route dns alphax-ollama ai.yourdomain.com</code>.</li><li>Point the tunnel's config at <code>http://localhost:11434</code> and run it as a service (<code>cloudflared service install</code>) so it survives reboots.</li><li>In the Cloudflare Zero Trust dashboard: Access &rarr; Applications &rarr; add <code>ai.yourdomain.com</code>, with a policy requiring <b>Service Auth</b> (not a login page \u2014 this CRM is a server calling another server, not a person in a browser).</li><li>Access &rarr; Service Auth &rarr; Service Tokens &rarr; create one. Copy its Client ID and Client Secret into the two fields below.</li><li>Set <b>AI Base URL</b> above to <code>https://ai.yourdomain.com</code>, save this form, then use <b>Test AI Connection</b>.</li></ol></div>"
+   "options": "<div class='text-muted small'><b>One-time setup, on the machine running Ollama and in the Cloudflare dashboard:</b><ol style='padding-left:18px;margin-bottom:0;'><li>Add a domain to Cloudflare (free plan is fine) if you haven't already.</li><li><code>cloudflared tunnel login</code>, then <code>cloudflared tunnel create alphax-ollama</code>.</li><li><code>cloudflared tunnel route dns alphax-ollama ai.yourdomain.com</code>.</li><li>Point the tunnel's config at <code>http://localhost:11434</code> and run it as a service (<code>cloudflared service install</code>) so it survives reboots.</li><li>In the Cloudflare Zero Trust dashboard: Access &rarr; Applications &rarr; add <code>ai.yourdomain.com</code>, with a policy requiring <b>Service Auth</b> (not a login page — this CRM is a server calling another server, not a person in a browser).</li><li>Access &rarr; Service Auth &rarr; Service Tokens &rarr; create one. Copy its Client ID and Client Secret into the two fields below.</li><li>Set <b>AI Base URL</b> above to <code>https://ai.yourdomain.com</code>, save this form, then use <b>Test AI Connection</b>.</li></ol></div>"
   },
   {
    "fieldname": "ai_cf_access_client_id",
@@ -1305,7 +1319,7 @@
   },
   {
    "default": "Converted",
-   "description": "Must match one of the options on Opportunity's own Status field exactly (case-sensitive) \u2014 used by the Win/Loss report, Sales Leaderboard, and the AI Assistant's conversion-funnel question to know which status means a deal was won.",
+   "description": "Must match one of the options on Opportunity's own Status field exactly (case-sensitive) — used by the Win/Loss report, Sales Leaderboard, and the AI Assistant's conversion-funnel question to know which status means a deal was won.",
    "fieldname": "won_status",
    "fieldtype": "Data",
    "label": "Opportunity \"Won\" Status Value"
@@ -1357,6 +1371,91 @@
    "fieldname": "retention_batch_size",
    "fieldtype": "Int",
    "label": "Retention Batch Size"
+  },
+  {
+   "fieldname": "ai_preset",
+   "fieldtype": "Select",
+   "label": "Preset",
+   "default": "Custom",
+   "options": "Custom\nOllama (self-hosted)\nvLLM (self-hosted)\nAlphaX GPU server kit\nOpenRouter (hosted open models)",
+   "description": "Fills in the server type and address. Self-hosted servers keep data in your network; OpenRouter is External."
+  },
+  {
+   "fieldname": "ai_model_info",
+   "fieldtype": "HTML",
+   "label": "Model Info"
+  },
+  {
+   "fieldname": "ai_selftest_section",
+   "fieldtype": "Section Break",
+   "label": "Model Self-Test",
+   "collapsible": 0,
+   "description": "Four checks with the prompts AlphaX uses (one in Arabic). A model that fails is kept away from automatic AI features. Changing the server address or model resets the result."
+  },
+  {
+   "fieldname": "ai_selftest_status",
+   "fieldtype": "Select",
+   "label": "Model Test Result",
+   "options": "Not tested\nPassed\nPartial\nFailed",
+   "default": "Not tested",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_selftest_on",
+   "fieldtype": "Datetime",
+   "label": "Model Tested On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_selftest_details",
+   "fieldtype": "Small Text",
+   "label": "Model Test Details",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_selftest_fingerprint",
+   "fieldtype": "Data",
+   "label": "Model Test Fingerprint",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_selftest_col",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ai_fast_selftest_status",
+   "fieldtype": "Select",
+   "label": "Fast Model Test Result",
+   "options": "Not tested\nPassed\nPartial\nFailed",
+   "default": "Not tested",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_fast_selftest_on",
+   "fieldtype": "Datetime",
+   "label": "Fast Model Tested On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_fast_selftest_details",
+   "fieldtype": "Small Text",
+   "label": "Fast Model Test Details",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_fast_selftest_fingerprint",
+   "fieldtype": "Data",
+   "label": "Fast Model Test Fingerprint",
+   "hidden": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "ai_free_tier",
+   "fieldtype": "Check",
+   "label": "Free Tier Model (External)",
+   "read_only": 1,
+   "description": "Set automatically for OpenRouter \":free\" models: always External, PII always masked, blocked in KSA Data Residency Mode."
   }
  ],
  "index_web_pages_for_search": 1,

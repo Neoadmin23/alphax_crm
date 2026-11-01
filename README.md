@@ -61,6 +61,22 @@ follow-up days, stale thresholds/action, the local AI endpoint, and PDPL
 retention. AI assist ships **off** — enable it after pointing `AI Base URL`
 at your Ollama / NISA AI Operator host.
 
+### Open models for AI Assist (0.42)
+
+AlphaX CRM Settings › AI Assist now helps you pick and check a self-hosted open model:
+
+- **Preset**: Ollama (self-hosted), vLLM (self-hosted), AlphaX GPU server kit, or OpenRouter (hosted open
+  models, External). It fills in the server type and address.
+- **Open Models Guide**: 12 open models (Qwen3.8 27B, Qwen3.6 27B / 35B-A3B, gpt-oss 20B / 120B, Gemma 4,
+  Llama 4 Scout, Mistral Small, DeepSeek V4 Flash) with licence, GPU size, Arabic quality and what each suits.
+- **Find Models on Server**: lists what is installed on the Ollama/vLLM server and fills in the model name.
+- **Test Model**: four checks (one in Arabic). A model that fails is kept away from automatic AI; a failing
+  Fast Model is not used. The Health Check reports the result and any free-tier model in use.
+- **GPU server kit** in `deploy/gpu-server/`: Ollama or vLLM behind Caddy (HTTPS + API key, model
+  management blocked), with `check.sh`.
+
+Full bilingual guide: [docs/OPEN_MODELS.md](docs/OPEN_MODELS.md).
+
 ### Health check and workflow controls (0.41)
 
 **AlphaX CRM Settings → Run Health Check** verifies the site against the approved Lead workflow: scheduler and

@@ -3,6 +3,43 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.42.1] — 2026-11-01
+### Self-test no longer blames the model for a dropped server or tunnel
+Seen on a live site: a Cloudflare quick tunnel returned 502, then 530, and the Fast Model was marked Failed.
+- An outage (HTTP 5xx, 401/403/429, connection error or timeout) stops the test and shows **Server unreachable**
+  with the reason and what to do. The model's earlier verdict is kept and nothing is paused.
+- A short warm-up call loads the model before the timed checks, so a cold start is not a failure.
+  Checks use the AI Timeout setting.
+- AI server errors are one readable line (`HTTP 530 — Cloudflare Tunnel error — the tunnel is down…`) instead of
+  a raw HTML page, everywhere in AlphaX.
+- Health Check now flags: a temporary `trycloudflare.com` quick tunnel; a Fast Model larger than the main model;
+  a main model under 7B; a Cloudflare Access Client ID that is not a service-token ID (often browser autofill).
+
+## [0.42.0] — 2026-11-01
+### Open models for AI Assist: guide, discovery, self-test, GPU server kit
+- **Open Models Guide** (AI Assist button, and in the setup-script dialog): 12 open models with licence, GPU
+  size, Arabic quality, context, Ollama tag, vLLM name and tool parser, and what each suits in AlphaX (all AI
+  features, light use as Fast Model, data centre). **Use as Model / Use as Fast Model** fill the field.
+- **Find Models on Server**: reads Ollama `/api/tags` or OpenAI-compatible `/v1/models`, labels models the
+  guide knows, flags free tiers, one click fills Model or Fast Model. System Manager only; the saved API key
+  is only sent to the server it was saved for.
+- **Model self-test** (Test Model / Test Fast Model): structured JSON, Arabic spelling, Ask AI planner (tool
+  choice) in English and in Arabic, using AlphaX's real prompts. Passed / Partial / Failed is stored with a
+  fingerprint of server type, address, path and model; any change resets it to Not tested.
+  - main model Failed → automatic AI paused (classification, next best action, intent detection, quotation
+    reminders, sequences, Ask AI planning) with a clear message; reviewed writing tools keep working;
+  - Fast Model Failed → not used, the main model takes over.
+- **Presets**: Ollama (self-hosted), vLLM (self-hosted), AlphaX GPU server kit, OpenRouter (hosted open models).
+- **Free tiers** (OpenRouter `:free`, `openrouter/free`): flagged *Free tier · External*; PII always masked;
+  blocked in KSA Data Residency Mode even when the host is allowed; Health Check warning while selected.
+- **Health Check**: model and Fast Model self-test results (Failed = problem, Partial / Not tested = warning),
+  guide match, free-tier use.
+- **GPU server kit** `deploy/gpu-server/`: Docker Compose with Ollama or vLLM profiles behind Caddy (automatic
+  HTTPS, API-key check, only chat + model list forwarded, model management 404), `.env.example`, `check.sh`,
+  bilingual setup guide.
+- Setup script: new **Large (qwen3.8:27b)** size for a 24 GB GPU. New installs default to `qwen3.8:27b`.
+- Docs: `docs/OPEN_MODELS.md` (English + Arabic).
+
 ## [0.41.0] — 2026-10-28
 ### Audit against the approved Lead workflow spec (A, WF-01…WF-07, C) — gaps closed, bugs fixed, health check
 See **SPEC_COMPLIANCE.md** for the requirement-by-requirement result and how each was tested.

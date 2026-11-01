@@ -197,11 +197,71 @@ def _ai(settings):
 		out.append(_c("AI (WF-07)", _("AI server"), "ok", f"{engine.provider(settings)} · {engine.chat_url(settings)} · {settings.ai_model}"))
 	except engine.AIError as e:
 		out.append(_c("AI (WF-07)", _("AI server"), "fail", str(e)[:300]))
+	out += _ai_models(settings)
 	out.append(_c("AI (WF-07)", _("Intent detection on inbound emails"), "ok" if cint(settings.get("ai_intent_detection", 1)) else "warn",
 		_("On") if cint(settings.get("ai_intent_detection", 1)) else _("Off")))
 	out.append(_c("AI (WF-07)", _("AI write limits (spec C)"), "ok" if not cint(settings.get("ai_next_action_todo")) else "warn",
 		_("AI writes only AI fields, timeline notes, notifications and drafts") if not cint(settings.get("ai_next_action_todo"))
 		else _("'Create a ToDo for the Lead Owner' is on: the AI also writes ToDos")))
+	return out
+
+
+def _ai_models(settings):
+	"""Model self-test results, guide match and free-tier use."""
+	from alphax_crm.ai import catalogue
+	from alphax_crm.ai.models import status_of
+
+	out = []
+	level = {"Passed": "ok", "Partial": "warn", "Not tested": "warn", "Failed": "fail"}
+	for target, label, model in (("main", _("Model self-test"), settings.ai_model),
+			("fast", _("Fast Model self-test"), settings.get("ai_fast_model"))):
+		if not model:
+			continue
+		st = status_of(settings, target)
+		info = catalogue.match(model)
+		detail = f"{model}: {_(st)}"
+		if info:
+			detail += f" · {info['name']} · {_('Arabic')}: {info['arabic']}"
+		if st == "Failed":
+			detail += " · " + (_("automatic AI is paused") if target == "main" else _("the main model is used instead"))
+		elif st == "Not tested":
+			detail += " · " + _("run Test Model in AI Assist")
+		out.append(_c("AI (WF-07)", label, level.get(st, "warn"), detail))
+	out += _ai_setup_advice(settings)
+	free = [m for m in (settings.ai_model, settings.get("ai_fast_model")) if m and catalogue.is_free_tier(settings.ai_base_url, m)]
+	if free:
+		out.append(_c("AI (WF-07)", _("Free-tier hosted model in use"), "warn",
+			_("{0}: External; its hosts may keep or train on prompts. PII is always masked and KSA Data Residency Mode "
+				"blocks it. Use a self-hosted model for production.").format(", ".join(free))))
+	return out
+
+
+def _ai_setup_advice(settings):
+	"""Setup mistakes seen on real sites: quick tunnels in production, model sizes swapped, autofilled secrets."""
+	from alphax_crm.ai import catalogue
+
+	out = []
+	if catalogue.is_quick_tunnel(settings.ai_base_url):
+		out.append(_c("AI (WF-07)", _("Temporary Cloudflare quick tunnel"), "warn",
+			_("{0}: stops when the AI machine sleeps or cloudflared closes, changes address on restart, and cuts answers "
+				"after ~100 s. Fine for a trial; use a named tunnel or the AlphaX GPU server kit for daily use.").format(
+				catalogue.host_of(settings.ai_base_url))))
+	main_b, fast_b = catalogue.size_b(settings.ai_model or ""), catalogue.size_b(settings.get("ai_fast_model") or "")
+	if main_b and fast_b and fast_b > main_b:
+		out.append(_c("AI (WF-07)", _("Fast Model is larger than the main model"), "warn",
+			_("Fast Model {0} (~{1}B) is bigger than Model {2} (~{3}B). Swap them: the larger model should do the main "
+				"work, the smaller one spell check and translation.").format(settings.get("ai_fast_model"), int(fast_b),
+				settings.ai_model, int(main_b))))
+	if main_b and main_b < 7:
+		out.append(_c("AI (WF-07)", _("Main model is small"), "warn",
+			_("{0} (~{1}B) is fine for spell check and translation but unreliable for Ask AI, intent detection and "
+				"automations. Use a 27B-class model (see Open Models Guide) as the main model when hardware allows.").format(
+				settings.ai_model, main_b if main_b % 1 else int(main_b))))
+	cf_id = (settings.get("ai_cf_access_client_id") or "").strip()
+	if cf_id and ("@" in cf_id or not cf_id.endswith(".access")):
+		out.append(_c("AI (WF-07)", _("Cloudflare Access Client ID looks wrong"), "warn",
+			_("\"{0}\" is not a Cloudflare service-token ID (those end in .access). It was probably filled in by the "
+				"browser's password autofill. Clear it unless you use Cloudflare Access.").format(cf_id)))
 	return out
 
 

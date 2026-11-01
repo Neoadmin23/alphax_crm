@@ -531,6 +531,8 @@ _SCRIPTS = {
 MODEL_SIZES = {
     "small": {"tag": "llama3.2:3b", "min_ram_gb": 8, "min_disk_gb": 5},
     "medium": {"tag": "llama3.1:8b", "min_ram_gb": 16, "min_disk_gb": 10},
+    # all AI features incl. Ask AI and automations; needs a 24 GB GPU (see the Open Models Guide)
+    "large": {"tag": "qwen3.8:27b", "min_ram_gb": 32, "min_disk_gb": 25},
 }
 
 

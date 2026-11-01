@@ -95,7 +95,14 @@ def boot_session(bootinfo):
 
 
 def _model(settings):
-	return settings.get("ai_fast_model") or settings.ai_model
+	"""Fast Model for writing tools, unless it failed the self-test (then the main model takes over)."""
+	fast = settings.get("ai_fast_model")
+	if fast:
+		from alphax_crm.ai.models import status_of
+
+		if status_of(settings, "fast") != "Failed":
+			return fast
+	return settings.ai_model
 
 
 def _check_access():

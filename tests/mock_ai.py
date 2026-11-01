@@ -95,10 +95,14 @@ class H(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self):
+        if self.headers.get("Authorization") == "Bearer reject-me":
+            return self._send(401, {"error": "unauthorized"})
+        names = ["llama3.1", "qwen3.5-9b", "qwen3.8:27b", "gpt-oss:20b", "gemma4:e4b", "tinyllama:1b", "weak-partial:7b"]
         if self.path == "/api/tags":
-            return self._send(200, {"models": [{"name": "llama3.1"}, {"name": "qwen3.5-9b"}]})
+            return self._send(200, {"models": [{"name": n} for n in names]})
         if self.path.endswith("/models"):
-            return self._send(200, {"data": [{"id": "llama3.1"}, {"id": "qwen3.5-9b"}]})
+            ids = names + ["qwen/qwen3.6-27b:free", "openai/gpt-oss-120b", "Qwen/Qwen3.6-27B-AWQ"]
+            return self._send(200, {"data": [{"id": n} for n in ids]})
         self._send(404, {})
 
     def do_POST(self):
@@ -109,9 +113,24 @@ class H(BaseHTTPRequestHandler):
         COUNTER[0] += 1
         json.dump({"path": self.path, "headers": dict(self.headers), "req": req},
                   open(f"{OUT}/{COUNTER[0]:05d}.json", "w"), ensure_ascii=False)
+        if "tunnel-down" in str(req.get("model") or ""):  # Cloudflare quick tunnel gone
+            body = ("<!DOCTYPE html>\n<html class=\"no-js\" lang=\"en-US\"><head>\n<title>Cloudflare Tunnel error | "
+                    "x.trycloudflare.com | Cloudflare</title></head><body>...</body></html>").encode()
+            self.send_response(530)
+            self.send_header("Content-Type", "text/html")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
         if "FAIL500" in user:
             return self._send(500, {"error": "boom"})
-        result = answer(system, user)
+        model = str(req.get("model") or "")
+        if "tinyllama" in model:  # a model too small for structured output: chats instead of JSON
+            result = "Sure! Here is what I think about your request."
+        elif "weak-partial" in model and ("query planner" in system or "spelling corrector" in system) \
+                and re.search(r"[\u0600-\u06FF]", user):
+            result = {"capability": "none", "answer": "I cannot read this."} if "query planner" in system else {"changes": []}
+        else:
+            result = answer(system, user)
         content = result if isinstance(result, str) else json.dumps(result, ensure_ascii=False)
         if self.path == "/api/chat":
             return self._send(200, {"message": {"role": "assistant", "content": content},
