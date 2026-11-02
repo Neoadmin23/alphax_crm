@@ -91,7 +91,7 @@ with sync_playwright() as p:
 	page.wait_for_timeout(1200)
 	page.locator(".page-actions button", has_text="Run Health Check").click()
 	page.wait_for_selector(".modal.show .modal-title >> text=AlphaX Health Check")
-	page.wait_for_timeout(500)
+	page.wait_for_timeout(2500)
 	rows = page.locator(".modal.show tbody tr").count()
 	check("Health Check dialog lists the checks", rows > 30, rows)
 	page.screenshot(path=f"{OUT}/4_health_check.png", full_page=False)

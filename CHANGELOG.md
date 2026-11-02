@@ -3,6 +3,40 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.42.4] — 2026-11-01
+### One-click fixes: next year's holidays, and fields the browser filled in
+Seen on a live site: Holiday List 2026 held only Friday/Saturday and ends on 31 December; the browser's password
+manager had typed the AI server URL into WhatsApp Phone Number ID and National Address API URL, and the AI key into the
+National Address API Key.
+- **Public holidays → Fix** creates next year's Holiday List (e.g. 2027) with the weekly offs (the days that are not AlphaX
+  working days), Founding Day (22 Feb), Eid al-Fitr and Eid al-Adha (4 days each, dates estimated from the Hijri calendar
+  and labelled "(estimated, confirm)") and National Day (23 Sep). Offered when the list in use ends within 90 days.
+- **The calendar moves on by itself:** when the list in use ends, AlphaX continues with the list that follows it
+  (2026 → 2027) for working days, reminders and escalations. Nothing to switch on 1 January.
+- A list with only weekly offs gets a second Fix: **add the KSA public holidays** to it.
+- **Fields filled in by the browser → Fix**: Health Check flags an e-mail or the AI server URL in an ID/URL field, and the
+  AI API key reused in another service's secret (without showing it), and clears them in one click.
+- The settings page now tells browsers and password managers not to autofill it, so this doesn't happen again.
+
+## [0.42.3] — 2026-11-01
+### AlphaX CRM Settings page: one tab per step of the sales process
+The 28 sections on one long page are now 9 numbered tabs, in the order a lead moves through the process:
+1. General (working days, holidays, notifications) · 2. Lead Capture · 3. Lead Quality · 4. Stages & Follow-up ·
+5. Quotations & Approvals · 6. Closure · 7. AI Setup · 8. AI Tools · 9. Reports & Data.
+- Sections are numbered (1.1, 2.1 …). Settings sit in two balanced columns; mapping and rule tables run full width below them.
+- Postponed stage settings moved next to Stage Progression; the Lost Quotation stage name moved to Closure.
+- Advanced sections (National Address, server setup, Cloudflare Access, AI governance, accounting dimensions) are collapsed.
+- No field was renamed or removed: existing values, reports and automations are unchanged.
+
+## [0.42.2] — 2026-11-01
+### Public holidays: use the Company's Holiday List, and check what is in it
+Seen on a live site: a Holiday List existed (set on the Company) but AlphaX reported "No Holiday List", and the list
+held only Friday/Saturday weekly offs, so Eid and National Day would still count as working days.
+- **Public Holidays** empty in AlphaX CRM Settings now falls back to the default Company's **Default Holiday List**.
+- Health Check says which list is used and where it comes from, and warns when the list has only weekly offs
+  (no Eid / National Day), when it ends within 60 days (create next year's list), or when it has already ended.
+  When all is well it shows the next public holiday.
+
 ## [0.42.1] — 2026-11-01
 ### Self-test no longer blames the model for a dropped server or tunnel
 Seen on a live site: a Cloudflare quick tunnel returned 502, then 530, and the Fast Model was marked Failed.

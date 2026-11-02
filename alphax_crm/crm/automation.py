@@ -51,12 +51,52 @@ def _time(value, default):
 		return default
 
 
+def holiday_list(settings=None):
+	"""The Holiday List AlphaX follows: the one picked in AlphaX CRM Settings, else the default
+	company's Default Holiday List (the one HR and payroll already use)."""
+	settings = settings or get_settings()
+	if settings.get("holiday_list"):
+		return frappe._dict(name=settings.holiday_list, source="AlphaX CRM Settings")
+	company = frappe.defaults.get_global_default("company") or frappe.db.get_single_value("Global Defaults", "default_company")
+	name = company and frappe.db.get_value("Company", company, "default_holiday_list")
+	if not name:
+		companies = frappe.get_all("Company", filters={"default_holiday_list": ["is", "set"]}, pluck="default_holiday_list")
+		name = companies[0] if len(set(companies)) == 1 else None
+		company = company if not name else frappe.db.get_value("Company", {"default_holiday_list": name}, "name")
+	return frappe._dict(name=name, source=_("Company {0}").format(company) if name else None)
+
+
+def following_list(name):
+	"""The Holiday List that carries on after `name` ends (e.g. 2027 after 2026), so the calendar keeps
+	working on 1 January without anyone switching lists. Prefers one named after the next year."""
+	if not name:
+		return None
+	to_date = frappe.db.get_value("Holiday List", name, "to_date")
+	if not to_date:
+		return None
+	nxt = add_days(to_date, 1)
+	# starts within a month after this one ends (a list may stop before 31 Dec) and runs past it
+	rows = frappe.get_all("Holiday List", filters={"from_date": ["between", [add_days(to_date, -31), add_days(to_date, 31)]],
+		"to_date": [">", to_date], "name": ["!=", name]}, pluck="name", order_by="from_date asc")
+	if not rows:
+		return None
+	year = str(getdate(nxt).year if getdate(nxt).month == 1 else getdate(nxt).year + 1)
+	return year if year in rows else rows[0]
+
+
+def holiday_lists(settings=None):
+	"""[current, following] list names in use (following may be missing)."""
+	hl = holiday_list(settings)
+	return [n for n in (hl.name, following_list(hl.name)) if n]
+
+
 def calendar(settings=None):
 	settings = settings or get_settings()
 	days = [d.strip() for d in (settings.get("business_days") or DEFAULT_DAYS).replace(",", "\n").split("\n") if d.strip()]
 	holidays = set()
-	if settings.get("holiday_list"):
-		holidays = {getdate(d) for d in frappe.get_all("Holiday", filters={"parent": settings.holiday_list}, pluck="holiday_date")}
+	names = holiday_lists(settings)
+	if names:
+		holidays = {getdate(d) for d in frappe.get_all("Holiday", filters={"parent": ["in", names]}, pluck="holiday_date")}
 	return frappe._dict(
 		days={WEEKDAYS.index(d) for d in days if d in WEEKDAYS},
 		start=_time(settings.get("business_start"), time(8, 0)),

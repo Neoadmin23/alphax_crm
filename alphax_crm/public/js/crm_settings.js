@@ -34,6 +34,7 @@ frappe.ui.form.on("AlphaX CRM Settings", {
         }
         alphax_render_model_info(frm);
         alphax_selftest_indicators(frm);
+        alphax_no_autofill(frm);
 
         ["windows", "mac", "linux"].forEach((os_name) => {
             const labels = { windows: __("Windows"), mac: __("macOS"), linux: __("Linux") };
@@ -437,4 +438,22 @@ function alphax_self_test(frm, target) {
     } else {
         go();
     }
+}
+
+
+// The browser's password manager treats any text box followed by a password box as a login and fills in the
+// saved user name / password (seen: an e-mail in CF-Access-Client-Id, the AI URL in WhatsApp Phone Number ID,
+// the AI key in other secrets). Tell it this page is not a login form.
+function alphax_no_autofill(frm) {
+    const apply = () => {
+        frm.$wrapper.find("input").each(function () {
+            const $i = $(this);
+            if ($i.attr("data-ax-noaf")) return;
+            $i.attr({ autocomplete: $i.attr("type") === "password" ? "new-password" : "off", "data-ax-noaf": 1,
+                "data-lpignore": "true", "data-1p-ignore": "true", "data-form-type": "other" });
+        });
+    };
+    apply();
+    setTimeout(apply, 500);
+    frm.$wrapper.off("shown.bs.tab.axnoaf").on("shown.bs.tab.axnoaf", apply);
 }

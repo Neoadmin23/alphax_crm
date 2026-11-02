@@ -143,8 +143,8 @@ def _run(catalogue, engine, models, writing, health):
 	adv = health._ai_setup_advice(frappe._dict(ai_base_url="https://abc.trycloudflare.com", ai_model="llama3.2:3b",
 		ai_fast_model="llama3.1:8b", ai_cf_access_client_id="erpsupport@irsaa.com"))
 	titles = " | ".join(r["title"] for r in adv)
-	check("health: quick tunnel, swapped sizes, small main model and autofilled CF id all flagged",
-		all(t in titles for t in ("quick tunnel", "larger than the main", "Main model is small", "Client ID looks wrong")), titles)
+	check("health: quick tunnel, swapped sizes and small main model flagged (autofill: see site_holidays_test)",
+		all(t in titles for t in ("quick tunnel", "larger than the main", "Main model is small")), titles)
 	check("health: a sound setup gets no setup warnings", not health._ai_setup_advice(frappe._dict(
 		ai_base_url="https://ai.company.sa", ai_model="qwen3.8:27b", ai_fast_model="gemma4:e4b", ai_cf_access_client_id="")))
 

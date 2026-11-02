@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, now_datetime
+from frappe.utils import add_days, cint, getdate, now_datetime, nowdate
 
 from alphax_crm.crm import workflow
 from alphax_crm.crm.utils import ensure_select_option, get_settings
@@ -133,8 +133,8 @@ def _configuration(settings):
 	days = ", ".join(workflow.auto.WEEKDAYS[d] for d in sorted(cal.days, key=lambda d: (d + 1) % 7))
 	out.append(_c("Configuration", _("Working days & hours (spec C)"), "ok" if cal.days else "fail",
 		f"{days}, {cal.start:%H:%M}–{cal.end:%H:%M}; {cal.mode}"))
-	out.append(_c("Configuration", _("Public holidays"), "ok" if settings.get("holiday_list") else "warn",
-		settings.get("holiday_list") or _("No Holiday List: Eid and National Day count as working days")))
+	out.append(_holidays(settings))
+	out += _autofill(settings)
 	wf = frappe.db.get_value("Workflow", {"document_type": "Lead", "is_active": 1}, "name")
 	paused_state = wf and frappe.db.exists("Workflow Document State", {"parent": wf, "state": "Returned for Correction"})
 	out.append(_c("Configuration", _("'Returned for Correction' pause"), "ok" if paused_state else "warn",
@@ -149,6 +149,43 @@ def _configuration(settings):
 
 
 # ------------------------------------------------------------------------------- data
+def _holidays(settings):
+	"""Public holidays: which list is used (and the one that follows it), whether the coming 12 months
+	contain real public holidays (not only weekends), and whether the calendar runs out soon.
+	A Fix button creates next year's list with Saudi public holidays."""
+	from alphax_crm.crm import holidays
+
+	title = _("Public holidays")
+	hl = workflow.auto.holiday_list(settings)
+	need = holidays.next_year_needed(settings)
+	fix = "holidays_next_year" if need else None
+	if not hl.name:
+		return _c("Configuration", title, "warn", _("No Holiday List: Eid and National Day count as working days. "
+			"Click Fix to create {0} with Saudi public holidays, or pick a list in Public Holidays (1. General)").format(need),
+			fix=fix)
+	names = workflow.auto.holiday_lists(settings)
+	where = _("{0} (from {1})").format(" → ".join(names), hl.source)
+	today = getdate(nowdate())
+	to_date = getdate(frappe.db.get_value("Holiday List", names[-1], "to_date") or today)
+	if to_date < today:
+		return _c("Configuration", title, "warn", _("{0} ended on {1}: every day now counts as a working day. "
+			"Click Fix to create {2}").format(where, to_date, need), fix=fix)
+	upcoming = frappe.get_all("Holiday", filters={"parent": ["in", names], "weekly_off": 0,
+		"holiday_date": ["between", [today, add_days(today, 365)]]}, fields=["holiday_date", "description"], order_by="holiday_date")
+	if need:
+		left = _("no public holidays left in it") if not upcoming else _("{0} public holidays left").format(len(upcoming))
+		return _c("Configuration", title, "warn", _("{0} ends on {1} ({2}). Click Fix to create {3} with the weekly offs, "
+			"Founding Day, Eid al-Fitr, Eid al-Adha (estimated dates, confirm when announced) and National Day; AlphaX "
+			"moves on to it automatically on 1 January").format(where, to_date, left, need), fix=fix)
+	if not upcoming:
+		return _c("Configuration", title, "warn", _("{0} has no public holidays in the coming 12 months, only weekly offs. "
+			"Click Fix to add Founding Day, Eid al-Fitr, Eid al-Adha (estimated dates, confirm when announced) and "
+			"National Day").format(where), fix="holidays_add_public")
+	nxt = upcoming[0]
+	return _c("Configuration", title, "ok", _("{0}: {1} public holidays in the coming 12 months; next: {2} {3}").format(
+		where, len(upcoming), nxt.holiday_date, nxt.description or ""))
+
+
 def _data(settings):
 	out = []
 	stages = workflow.approved_stages(settings)
@@ -257,12 +294,51 @@ def _ai_setup_advice(settings):
 			_("{0} (~{1}B) is fine for spell check and translation but unreliable for Ask AI, intent detection and "
 				"automations. Use a 27B-class model (see Open Models Guide) as the main model when hardware allows.").format(
 				settings.ai_model, main_b if main_b % 1 else int(main_b))))
-	cf_id = (settings.get("ai_cf_access_client_id") or "").strip()
-	if cf_id and ("@" in cf_id or not cf_id.endswith(".access")):
-		out.append(_c("AI (WF-07)", _("Cloudflare Access Client ID looks wrong"), "warn",
-			_("\"{0}\" is not a Cloudflare service-token ID (those end in .access). It was probably filled in by the "
-				"browser's password autofill. Clear it unless you use Cloudflare Access.").format(cf_id)))
 	return out
+
+
+AUTOFILL_DATA = {  # fieldname: (label, check that a real value passes)
+	"ai_cf_access_client_id": ("CF-Access-Client-Id", lambda v: "@" not in v and v.endswith(".access")),
+	"whatsapp_phone_number_id": ("WhatsApp Phone Number ID", lambda v: v.isdigit()),
+	"na_api_url": ("National Address API URL", lambda v: v.startswith("http") and "@" not in v),
+}
+AUTOFILL_SECRETS = {
+	"ai_cf_access_client_secret": "CF-Access-Client-Secret", "whatsapp_access_token": "WhatsApp Access Token",
+	"whatsapp_app_secret": "WhatsApp App Secret", "na_api_key": "National Address API Key",
+}
+
+
+def _secret(settings, field):
+	try:
+		return settings.get_password(field, raise_exception=False) or ""
+	except Exception:
+		return ""
+
+
+def _autofill_suspects(settings):
+	"""Values the browser's password manager typed into the wrong fields: an e-mail or the AI server URL in an
+	ID/URL field, or the AI API key copied into another service's secret."""
+	ai_url = (settings.get("ai_base_url") or "").strip().rstrip("/")
+	ai_key = _secret(settings, "ai_api_key") if settings.get("ai_api_key") else ""
+	out = []
+	for field, (label, ok) in AUTOFILL_DATA.items():
+		v = (settings.get(field) or "").strip()
+		if v and (not ok(v) or "@" in v or (ai_url and v.rstrip("/") == ai_url)):
+			out.append({"field": field, "label": label, "value": v})
+	for field, label in AUTOFILL_SECRETS.items():
+		if ai_key and settings.get(field) and _secret(settings, field) == ai_key:
+			out.append({"field": field, "label": label, "value": _("the AI API key")})
+	return out
+
+
+def _autofill(settings):
+	bad = _autofill_suspects(settings)
+	if not bad:
+		return []
+	return [_c("Configuration", _("Fields filled in by the browser"), "warn",
+		_("{0}. The browser's saved password was typed into these fields. Click Fix to clear them "
+			"(AlphaX now tells the browser not to autofill this page)").format(
+			"; ".join(f"{b['label']} = {b['value']}" for b in bad)), fix="clear_autofill")]
 
 
 # ------------------------------------------------------------------------------- fixes
@@ -296,6 +372,26 @@ def apply_fix(fix):
 				settings.append("stage_sla_rules", dict(zip(("stage", "days", "notify", "require_no_activity", "label",
 					"repeat_every_days"), row)))
 		settings.save()
+	elif fix == "holidays_next_year":
+		from alphax_crm.crm import holidays
+
+		year = holidays.next_year_needed(settings)
+		if year:
+			name = holidays.create_holiday_list(year, settings)
+			if not workflow.auto.holiday_list(settings).name:
+				settings.holiday_list = name
+				settings.save()
+	elif fix == "holidays_add_public":
+		from alphax_crm.crm import holidays
+
+		for name in workflow.auto.holiday_lists(settings):
+			holidays.add_public_holidays(name)
+	elif fix == "clear_autofill":
+		bad = _autofill_suspects(settings)
+		for f in bad:
+			settings.set(f["field"], None)
+		if bad:
+			settings.save()
 	else:
 		frappe.throw(_("Unknown fix {0}").format(fix))
 	return run_health_check()

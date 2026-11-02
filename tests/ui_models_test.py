@@ -146,6 +146,7 @@ with sync_playwright() as p:
 	page.evaluate("() => cur_frm.set_value('ai_model', 'qwen/qwen3.6-27b:free')")
 	page.wait_for_function("() => cur_frm.fields_dict.ai_model_info.$wrapper.text().includes('Free tier')")
 	check("free-tier model badge: Free tier · External", True)
+	page.locator(".form-tabs .nav-link", has_text="AI Setup").click()  # fields now live on the 7. AI Setup tab
 	page.locator("[data-fieldname='ai_model_info']").scroll_into_view_if_needed()
 	shot(page, f"{OUT}/5_free_tier_badge.png")
 	# back to the mock server
