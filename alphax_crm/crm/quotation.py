@@ -183,17 +183,3 @@ def notify_users(users, subject, message, document_type=None, document_name=None
             ).insert(ignore_permissions=True)
         except Exception:
             log_error("notify_users")
-
-
-def _notify_approvers(doc, settings):
-    users = approver_users(settings)
-    if not users:
-        return
-    party = doc.get("party_name") or doc.get("customer_name") or doc.get("quotation_to")
-    subject = f"AlphaX: Quotation {doc.name} submitted ({party or ''})"
-    message = (
-        f"{doc.get('owner')} submitted Quotation {doc.name}"
-        + (f" for {party}" if party else "")
-        + f", amount {doc.get('grand_total')} {doc.get('currency') or ''}."
-    )
-    notify_users(users, subject, message, "Quotation", doc.name)

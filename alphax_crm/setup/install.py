@@ -28,6 +28,7 @@ def after_install():
     ensure_closure_defaults()
     ensure_wf_defaults()
     seed_stage_sla_rules()
+    seed_email_rules()
     setup_notifications()
     retire_replaced_notifications()
     setup_lead_approval_workflow()
@@ -57,6 +58,7 @@ def after_migrate():
     ensure_closure_defaults()
     ensure_wf_defaults()
     seed_stage_sla_rules()
+    seed_email_rules()
     upgrade_workflow_defaults()
     setup_notifications()
     retire_replaced_notifications()
@@ -450,6 +452,17 @@ def upgrade_workflow_defaults():
         settings.flags.ignore_permissions = True
         settings.flags.ignore_mandatory = True
         settings.save(ignore_permissions=True)
+
+
+def seed_email_rules():
+    """Email Templates + AlphaX CRM Settings > 1.2 Emails & Notifications rows (crm/emails.py).
+    Only adds what is missing: wording edited in the front end is never overwritten."""
+    try:
+        from alphax_crm.crm.emails import seed
+
+        seed()
+    except Exception:
+        frappe.log_error(title="AlphaX CRM: email templates setup", message=frappe.get_traceback())
 
 
 def seed_stage_sla_rules():

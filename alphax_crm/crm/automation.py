@@ -202,14 +202,34 @@ def already_done(key) -> bool:
 	return bool(frappe.db.exists(LOG_DT, {"dedupe_key": key}))
 
 
-def notify(rule, recipients, subject, message, lead=None, reference=None, trigger_date=None,
-		email=True, timeline=True, respect_hours=True, key=None):
+def notify(rule, recipients, subject=None, message=None, lead=None, reference=None, trigger_date=None,
+		email=True, timeline=True, respect_hours=True, key=None, template=None, context=None):
 	"""Send (or queue) a rule notification once. Returns the AlphaX Automation Log name, or None
-	if this exact notification (same key) was already handled."""
+	if this exact notification (same key) was already handled.
+
+	The wording comes from the rule's Email Template (crm/emails.py, `template` defaults to `rule`),
+	rendered with `context`; the rule can be switched off or made in-app only in AlphaX CRM Settings >
+	1.2 Emails & Notifications. `subject`/`message` are only used for rules without a template."""
+	from alphax_crm.crm import emails
+
 	settings = get_settings()
 	key = key or make_key(rule, lead, reference, trigger_date)
 	if already_done(key):
 		return None
+	built = emails.build(template or rule, context, lead=lead, reference=reference, settings=settings)
+	if built is not None:
+		if not built["enabled"]:
+			frappe.get_doc({"doctype": LOG_DT, "rule": rule, "lead": lead, "dedupe_key": key, "status": "Skipped",
+				"reference_doctype": reference[0] if reference else None,
+				"reference_name": reference[1] if reference else None,
+				"trigger_date": getdate(trigger_date) if trigger_date else getdate(),
+				"subject": (subject or rule)[:140],
+				"result": _("Turned off in AlphaX CRM Settings > Emails & Notifications")}).insert(ignore_permissions=True)
+			return None
+		subject, message = built["subject"], built["message"]
+		if built["email"] is not None:
+			email = bool(built["email"])
+	subject, message = subject or rule, message or ""
 	users = sorted({u for u in recipients or [] if u and u not in ("Guest",)})
 	log = frappe.get_doc({
 		"doctype": LOG_DT, "rule": rule, "lead": lead, "dedupe_key": key,

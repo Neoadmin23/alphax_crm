@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import frappe
 from frappe import _
-from frappe.utils import add_days, cint, date_diff, formatdate, fmt_money, get_datetime, getdate, now_datetime, nowdate
+from frappe.utils import (add_days, cint, date_diff, escape_html, formatdate, get_datetime, get_url_to_form, getdate,
+	now_datetime, nowdate)
 
 from alphax_crm.crm import automation as auto
+from alphax_crm.crm import emails
 from alphax_crm.crm.utils import ensure_select_option, get_settings, log_error
 
 STAGE = "status"
@@ -311,10 +313,9 @@ def quotation_after_insert(doc, method=None):
 		return
 	try:
 		lead = auto.lead_for_quotation(doc)
-		auto.notify("WF-02 Quotation created", auto.approvers(settings),
-			_("Quotation {0} created by {1}").format(doc.name, frappe.utils.get_fullname(doc.owner)),
-			_quotation_summary(doc, lead), lead=lead, reference=("Quotation", doc.name), trigger_date=nowdate(),
-			key=f"WF-02 created|{doc.name}")
+		auto.notify("WF-02 Quotation created", auto.approvers(settings), lead=lead, reference=("Quotation", doc.name),
+			trigger_date=nowdate(), key=f"WF-02 created|{doc.name}",
+			context={**emails.quotation_context(doc, lead), "created_by": frappe.utils.get_fullname(doc.owner)})
 	except Exception:
 		log_error(f"WF-02 created {doc.name}")
 
@@ -330,13 +331,12 @@ def quotation_on_submit(doc, method=None):
 	try:
 		if cint(settings.get("wf03_confirmation_enabled", 1)):
 			people = [doc.owner] + ([frappe.db.get_value("Lead", lead, "lead_owner")] if lead else [])
-			auto.notify("WF-03 Quotation confirmation", people, _("Your quotation has been created successfully"),
-				_quotation_summary(doc, lead), lead=lead, reference=("Quotation", doc.name), trigger_date=nowdate(),
-				key=f"WF-03 confirm|{doc.name}")
+			auto.notify("WF-03 Quotation confirmation", people, lead=lead, reference=("Quotation", doc.name),
+				trigger_date=nowdate(), key=f"WF-03 confirm|{doc.name}", context=emails.quotation_context(doc, lead))
 		if cint(settings.get("notify_approvers_on_quotation", 1)):
-			auto.notify("WF-02 Quotation submitted", auto.approvers(settings),
-				_("Quotation {0} submitted").format(doc.name), _quotation_summary(doc, lead), lead=lead,
-				reference=("Quotation", doc.name), trigger_date=nowdate(), key=f"WF-02 submitted|{doc.name}")
+			auto.notify("WF-02 Quotation submitted", auto.approvers(settings), lead=lead,
+				reference=("Quotation", doc.name), trigger_date=nowdate(), key=f"WF-02 submitted|{doc.name}",
+				context=emails.quotation_context(doc, lead))
 	except Exception:
 		log_error(f"WF-03 notify {doc.name}")
 
@@ -363,18 +363,6 @@ def _wf03_move_lead(doc, lead, settings):
 			"WF-03 Lead moved to Quotation")
 	elif before and frappe.db.get_value("Lead", lead, STAGE) != before:
 		frappe.db.set_value("Lead", lead, STAGE, before, update_modified=False)
-
-
-def _quotation_summary(doc, lead):
-	party = (frappe.db.get_value("Lead", lead, "company_name") or frappe.db.get_value("Lead", lead, "lead_name")) if lead \
-		else (doc.get("customer_name") or doc.get("party_name"))
-	return "\n".join([
-		f"**{_('Quotation No.')}:** {doc.name}",
-		f"**{_('Date')}:** {formatdate(doc.transaction_date)}",
-		f"**{_('Valid Till')}:** {formatdate(doc.valid_till) if doc.get('valid_till') else '-'}",
-		f"**{_('Amount')}:** {fmt_money(doc.grand_total, currency=doc.currency)}",
-		f"**{_('Lead / Company')}:** {party or '-'}" + (f" ({lead})" if lead else ""),
-	])
 
 
 def check_lost_quotation(doc, settings):
@@ -426,21 +414,17 @@ def wf02_check_lead(lead, settings=None, on_entry=False):
 		return
 	entry = auto.stage_entry_datetime(lead, "Quotation")
 	people = auto.lead_people(lead)
-	title = frappe.db.get_value("Lead", lead, "lead_name")
-	base = _("Lead {0} ({1}) is at stage Quotation but no Quotation is linked to it.").format(lead, title)
 	if on_entry:
-		auto.notify("WF-02 No quotation (alert)", people, _("Create the quotation for Lead {0}").format(lead), base,
-			lead=lead, trigger_date=entry, key=f"WF-02 alert|{lead}|{getdate(entry)}")
+		auto.notify("WF-02 No quotation (alert)", people, lead=lead, trigger_date=entry,
+			key=f"WF-02 alert|{lead}|{getdate(entry)}")
 		return
 	hours = auto.working_hours_between(entry, now_datetime())
 	if hours >= cint(settings.get("wf02_escalation_hours") or 72):
-		auto.notify("WF-02 No quotation (escalation)", list(set(auto.approvers(settings) + people)),
-			_("Escalation: no quotation for Lead {0} after {1} working hours").format(lead, int(hours)), base,
-			lead=lead, trigger_date=entry, key=f"WF-02 escalation|{lead}|{getdate(entry)}")
+		auto.notify("WF-02 No quotation (escalation)", list(set(auto.approvers(settings) + people)), lead=lead,
+			trigger_date=entry, key=f"WF-02 escalation|{lead}|{getdate(entry)}", context={"hours": int(hours)})
 	elif hours >= cint(settings.get("wf02_reminder_hours") or 24):
-		auto.notify("WF-02 No quotation (reminder)", people,
-			_("Reminder: no quotation for Lead {0} yet").format(lead), base,
-			lead=lead, trigger_date=entry, key=f"WF-02 reminder|{lead}|{getdate(entry)}")
+		auto.notify("WF-02 No quotation (reminder)", people, lead=lead, trigger_date=entry,
+			key=f"WF-02 reminder|{lead}|{getdate(entry)}", context={"hours": int(hours)})
 
 
 def wf02_hourly():
@@ -506,26 +490,20 @@ def _wf04_quotation(q, today, before, after, settings):
 			frappe.db.set_value("Lead", lead, "alphax_proposed_action",
 				_("Confirm Lost Quotation for {0} (expired {1}, no action)").format(name, vt), update_modified=False)
 		auto.notify("WF-04 Expired, no action (escalation)", list({owner} | set(auto.approvers(settings))),
-			_("Quotation {0} expired {1} days ago: confirm Lost Quotation?").format(name, -days_to),
-			_("Quotation {0} expired on {1} and nothing was done. Proposed action: mark it as **Lost Quotation**. "
-				"The Lead Owner confirms with the Confirm Lost Quotation button on the Lead or Quotation.").format(name, vt),
-			lead=lead, reference=ref, trigger_date=q.valid_till, key=key("T+"))
+			lead=lead, reference=ref, trigger_date=q.valid_till, key=key("T+"),
+			context={**emails.quotation_context(name, lead), "days_expired": -days_to})
 		return
 	if days_to <= 0:
 		if activity or auto.already_done(key("T0")):
 			return
 		auto.notify("WF-04 Valid Till reached, no activity", list({owner} | set(auto.approvers(settings))),
-			_("Quotation {0} expires today with no follow-up").format(name),
-			_("Quotation {0} reaches its Valid Till date ({1}) with no activity since it was issued. "
-				"Please extend it, postpone the Lead, or mark it as lost.").format(name, vt),
-			lead=lead, reference=ref, trigger_date=q.valid_till, key=key("T0"))
+			lead=lead, reference=ref, trigger_date=q.valid_till, key=key("T0"), context=emails.quotation_context(name, lead))
 		return
 	# T-2 in working days: a quotation valid till Sunday gets its reminder on Thursday, not on Friday
 	if auto.working_days_between(today, q.valid_till) <= before and not auto.already_done(key("T-")):
 		if activity:
-			auto.notify("WF-04 Validity notice", [owner], _("Quotation {0} is valid until {1}").format(name, vt),
-				_("Quotation {0} expires on {1}. Recent activity: {2}.").format(name, vt, ", ".join(activity)),
-				lead=lead, reference=ref, trigger_date=q.valid_till, key=key("T-"))
+			auto.notify("WF-04 Validity notice", [owner], lead=lead, reference=ref, trigger_date=q.valid_till, key=key("T-"),
+				context={**emails.quotation_context(name, lead), "activity": ", ".join(activity)})
 		else:
 			draft = None
 			if cint(settings.get("wf04_ai_draft", 1)) and q.contact_email and cint(settings.get("ai_enabled")):
@@ -535,12 +513,9 @@ def _wf04_quotation(q, today, before, after, settings):
 					draft = draft_quotation_reminder(name, lead_language(lead) if lead else None)
 				except Exception:
 					log_error(f"WF-04 AI draft {name}")
-			msg = _("Quotation {0} expires on {1} and there has been no follow-up since it was issued.").format(name, vt)
-			if draft:
-				msg += "\n\n" + _("An AI-drafted follow-up email is ready for your review: {0} (it is not sent until you approve it).").format(draft)
-			auto.notify("WF-04 Expiring, no activity (reminder)", [owner],
-				_("Follow up on Quotation {0} (expires {1})").format(name, vt), msg,
-				lead=lead, reference=ref, trigger_date=q.valid_till, key=key("T-"))
+			auto.notify("WF-04 Expiring, no activity (reminder)", [owner], lead=lead, reference=ref,
+				trigger_date=q.valid_till, key=key("T-"),
+				context={**emails.quotation_context(name, lead), "ai_draft": draft or ""})
 
 
 def _quotation_activity(q, since=None):
@@ -570,14 +545,13 @@ def lost_quotation_digest():
 		for q in auto.quotations_for_lead(l.name, {"status": "Lost"}, fields=("name", "order_lost_reason", "grand_total")):
 			r = q.order_lost_reason or "-"
 			reasons[r] = reasons.get(r, 0) + 1
-	lines = [f"**{_('New since last working day')}: {len(new)}**"]
-	lines += [f"- {l.name} ({l.lead_name or ''}), owner {l.lead_owner or l.owner}" for l in new[:30]]
-	lines.append(f"\n**{_('All leads at Lost Quotation')}: {len(leads)}**")
-	if reasons:
-		lines.append(_("Top reasons") + ": " + ", ".join(f"{k} ({v})" for k, v in sorted(reasons.items(), key=lambda x: -x[1])[:5]))
-	auto.notify("WF-04 Lost quotation digest", auto.approvers(settings),
-		_("Lost quotations follow-up: {0} new, {1} total").format(len(new), len(leads)), "\n".join(lines),
-		trigger_date=nowdate(), key=f"WF-04 digest|{nowdate()}")
+	items = "".join(f'<li><a href="{get_url_to_form("Lead", l.name)}">{l.name}</a> ({escape_html(l.lead_name or "")}), '
+		f"owner {l.lead_owner or l.owner}</li>" for l in new[:30])
+	auto.notify("WF-04 Lost quotation digest", auto.approvers(settings), trigger_date=nowdate(),
+		key=f"WF-04 digest|{nowdate()}", context={
+			"new_count": len(new), "total": len(leads), "new_leads": [dict(l) for l in new[:30]],
+			"new_leads_html": f"<ul>{items}</ul>" if items else "",
+			"top_reasons": ", ".join(f"{k} ({v})" for k, v in sorted(reasons.items(), key=lambda x: -x[1])[:5])})
 
 
 # ============================================================================ WF-05 SLA engine (daily 08:00)
@@ -666,11 +640,10 @@ def _sla_lead(lead, stage, stage_rules, today, settings):
 		if rule.notify in ("Approver (Sales Manager)", "Both"):
 			recipients += auto.approvers(settings)
 		label = rule.label or f"{stage} day {milestone}"
-		msg = _('Lead {0} ({1}) has been at stage "{2}" for {3} day(s)').format(lead.name, lead.lead_name or "", stage, days)
-		msg += "." if activity else _(" with no recorded activity.")
-		to_send.append((recipients, f"AlphaX SLA: {label} — {lead.name}", msg, key))
-	for recipients, subject, msg, key in reversed(to_send):  # oldest milestone first in the inbox
-		auto.notify(f"WF-05 {stage}", recipients, subject, msg, lead=lead.name, trigger_date=entry, key=key)
+		to_send.append((recipients, {"label": label, "stage": stage, "days": days, "no_activity": not activity}, key))
+	for recipients, ctx, key in reversed(to_send):  # oldest milestone first in the inbox
+		auto.notify(f"WF-05 {stage}", recipients, lead=lead.name, trigger_date=entry, key=key, template="WF-05 Stage SLA",
+			context=ctx)
 
 
 def postponed_daily(settings):
@@ -688,15 +661,12 @@ def postponed_daily(settings):
 			continue
 		owner = lead.lead_owner or lead.owner
 		activity = auto.activity_since(lead.name, due)
-		auto.notify("WF-05 Postponed follow-up", [owner], _("Postponed Lead {0} is due for follow-up ({1})").format(
-			lead.name, formatdate(due)), _("Lead {0} ({1}) was postponed to {2}.").format(lead.name, lead.lead_name or "",
-			formatdate(due)), lead=lead.name, trigger_date=due, key=f"WF-05 postponed|{lead.name}|{due}")
+		auto.notify("WF-05 Postponed follow-up", [owner], lead=lead.name, trigger_date=due,
+			key=f"WF-05 postponed|{lead.name}|{due}", context={"due": formatdate(due)})
 		if date_diff(today, due) >= 1 and not activity:
 			auto.notify("WF-05 Postponed overdue (approvers)", list({owner} | set(auto.approvers(settings))),
-				_("Postponed Lead {0} overdue with no activity").format(lead.name),
-				_("Lead {0} ({1}) was due on {2} and no comment or activity has been added since.").format(
-					lead.name, lead.lead_name or "", formatdate(due)), lead=lead.name, trigger_date=due,
-				key=f"WF-05 postponed-overdue|{lead.name}|{due}")
+				lead=lead.name, trigger_date=due, key=f"WF-05 postponed-overdue|{lead.name}|{due}",
+				context={"due": formatdate(due)})
 
 
 CLOSING_FIELDS = ("custom_expected_closing_date", "expected_closing_date", "expected_closing", "alphax_expected_closing_date")
@@ -721,10 +691,8 @@ def contract_close_daily(settings):
 		if not close or getdate(close) >= today:
 			continue
 		auto.notify("WF-05 Expected closing passed", list({lead.lead_owner or lead.owner} | set(auto.approvers(settings))),
-			_("Contract for Lead {0} not signed: expected closing {1} has passed").format(lead.name, formatdate(close)),
-			_("Lead {0} ({1}) is still at Contract Under Signing; the Expected Closing Date was {2}.").format(
-				lead.name, lead.lead_name or "", formatdate(close)), lead=lead.name, trigger_date=close,
-			key=f"WF-05 closing-passed|{lead.name}|{getdate(close)}")
+			lead=lead.name, trigger_date=close, key=f"WF-05 closing-passed|{lead.name}|{getdate(close)}",
+			context={"closing_date": formatdate(close)})
 
 
 def new_lead_alert(doc):
@@ -732,10 +700,9 @@ def new_lead_alert(doc):
 	owner = doc.get("lead_owner")
 	if not owner:
 		return
-	auto.notify("New lead", [owner], _("New lead {0} (score {1})").format(doc.lead_name or doc.name, doc.get("alphax_lead_score") or 0),
-		_("A new lead has been captured and assigned to you.\n\nName: {0}\nSource: {1}\nScore: {2}\n\n"
-			"Respond quickly: speed-to-lead drives conversion.").format(doc.lead_name or "", doc.get("source") or "-",
-			doc.get("alphax_lead_score") or 0), lead=doc.name, key=f"New lead|{doc.name}")
+	auto.notify("New lead", [owner], lead=doc.name, key=f"New lead|{doc.name}", context={
+		"lead": doc.as_dict(), "lead_name": doc.lead_name or doc.name, "source": doc.get("source") or "-",
+		"score": doc.get("alphax_lead_score") or 0})
 
 
 def _previous_working_day():
@@ -758,10 +725,9 @@ def followup_due_daily():
 			fields=["name", "lead_name", "lead_owner", "owner", "status", "alphax_next_contact_date"], limit=5000):
 		if (lead.status or "").lower() in terminal or auto.is_paused(lead.name):
 			continue
-		auto.notify("Follow-up due", [lead.lead_owner or lead.owner], _("Follow-up due for {0}").format(lead.lead_name or lead.name),
-			_("The Next Contact Date for Lead {0} ({1}) is {2}.").format(lead.name, lead.lead_name or "",
-				formatdate(lead.alphax_next_contact_date)), lead=lead.name, trigger_date=lead.alphax_next_contact_date,
-			key=f"Follow-up due|{lead.name}|{lead.alphax_next_contact_date}")
+		auto.notify("Follow-up due", [lead.lead_owner or lead.owner], lead=lead.name,
+			trigger_date=lead.alphax_next_contact_date, key=f"Follow-up due|{lead.name}|{lead.alphax_next_contact_date}",
+			context={"due": formatdate(lead.alphax_next_contact_date)})
 
 
 DAILY_JOBS = ("sla_daily", "wf04_daily", "lost_quotation_digest", "followup_due_daily")
