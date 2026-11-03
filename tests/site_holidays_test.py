@@ -93,7 +93,7 @@ def _holiday_tests(automation, health, holidays, company, today, created):
 	_list("ZZ Weekends Only", add_days(today, -300), end)
 	s = _settings(holiday_list="ZZ Weekends Only")
 	r = health._holidays(s)
-	nxt = getdate(end).year + 1
+	nxt = getdate(add_days(end, 1)).year
 	check("list ending soon with no public holidays -> warn, offers to create next year's",
 		r["status"] == "warn" and r.get("fix") == "holidays_next_year" and str(nxt) in r["detail"]
 		and "no public holidays left" in r["detail"], r)

@@ -106,4 +106,5 @@ def next_year_needed(settings=None):
 	to_date = frappe.db.get_value("Holiday List", hl.name, "to_date")
 	if not to_date or automation.following_list(hl.name):
 		return None
-	return getdate(to_date).year + 1 if (getdate(to_date) - getdate(nowdate())).days <= 90 else None
+	# the year of the day after the list ends: a list ending 1 Jan 2027 needs 2027, not 2028
+	return (getdate(to_date) + timedelta(days=1)).year if (getdate(to_date) - getdate(nowdate())).days <= 90 else None

@@ -3,6 +3,20 @@
 All notable changes to `alphax_crm`. Versions follow the app version in
 `alphax_crm/__init__.py`, `hooks.py` (`app_version`) and `setup.py`.
 
+## [0.43.0] — 2026-11-02
+### Email wording and on/off switches in the front end
+- **New: AlphaX CRM Settings → 1. General → 1.2 Emails & Notifications.** One row per notification AlphaX sends (19):
+  who gets it, when, **On** (off = not sent, logged as Skipped), **Email** (off = in-app bell only) and its
+  **Email Template**. *Preview With Latest Lead* shows the subject and body rendered with real data.
+- **The wording now lives in Email Templates** ("AlphaX - New lead", "AlphaX - WF-04 Validity notice", …), editable in
+  Settings → Email Template, Jinja variables listed on each row ({{ lead.lead_name }}, {{ quotation_no }}, {{ link }} …).
+  Arabic works. Install/migrate only creates what is missing; edits are never overwritten. A template with a mistake
+  falls back to the built-in wording and writes an Error Log, so reminders never stop.
+- Every email now ends with a link to the Lead / Quotation.
+- Removed old, unscheduled notifier code (tasks.run_stage_sla_rules, run_postponed_followups, run_lost_quotation_digest,
+  quotation._notify_approvers), replaced in 0.41 by the business-hours rules.
+- Fix: a Holiday List ending on 1 January now asks for that year's list (was the year after).
+
 ## [0.42.4] — 2026-11-01
 ### One-click fixes: next year's holidays, and fields the browser filled in
 Seen on a live site: Holiday List 2026 held only Friday/Saturday and ends on 31 December; the browser's password

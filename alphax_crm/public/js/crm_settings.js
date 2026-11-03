@@ -457,3 +457,31 @@ function alphax_no_autofill(frm) {
     setTimeout(apply, 500);
     frm.$wrapper.off("shown.bs.tab.axnoaf").on("shown.bs.tab.axnoaf", apply);
 }
+
+
+// 1.2 Emails & Notifications: show what the email will look like, rendered with the latest Lead.
+frappe.ui.form.on("AlphaX Email Rule", {
+    preview(frm, cdt, cdn) {
+        const row = locals[cdt][cdn];
+        const go = () => frappe.call({
+            method: "alphax_crm.crm.emails.preview",
+            args: { rule: row.rule },
+            freeze: true,
+        }).then((r) => {
+            const out = r.message || {};
+            if (!out.enabled) {
+                frappe.msgprint(__("This notification is switched off."));
+                return;
+            }
+            const how = out.email ? __("Email + in-app notification") : __("In-app notification only");
+            frappe.msgprint({
+                title: __("Preview: {0}", [row.rule]),
+                wide: true,
+                message: `<p class="text-muted small">${frappe.utils.escape_html(how)} · ${__("sample data from the latest Lead")}</p>
+                    <p><b>${__("Subject")}:</b> ${frappe.utils.escape_html(out.subject || "")}</p><hr>
+                    <div>${frappe.markdown(out.message || "")}</div>`,
+            });
+        });
+        frm.is_dirty() ? frm.save().then(go) : go();
+    },
+});

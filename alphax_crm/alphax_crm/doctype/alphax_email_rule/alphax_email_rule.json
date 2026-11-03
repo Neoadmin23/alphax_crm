@@ -1,0 +1,98 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "creation": "2026-11-02 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "rule",
+  "recipients",
+  "enabled",
+  "send_email",
+  "email_template",
+  "column_break_info",
+  "trigger",
+  "variables",
+  "preview"
+ ],
+ "fields": [
+  {
+   "columns": 3,
+   "fieldname": "rule",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Notification",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "recipients",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Sent To",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "On",
+   "description": "Off = this notification is not sent at all (it is logged as Skipped in AlphaX Automation Log)."
+  },
+  {
+   "columns": 1,
+   "default": "1",
+   "fieldname": "send_email",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Email",
+   "description": "Off = in-app notification only (bell icon). The general switch 'Also Email Notifications' above still applies."
+  },
+  {
+   "columns": 3,
+   "fieldname": "email_template",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Email Template",
+   "options": "Email Template",
+   "description": "Subject and body of this notification. Open the template to change the wording (Jinja: {{ lead.lead_name }} ...)."
+  },
+  {
+   "fieldname": "column_break_info",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "trigger",
+   "fieldtype": "Small Text",
+   "label": "When It Is Sent",
+   "read_only": 1
+  },
+  {
+   "fieldname": "variables",
+   "fieldtype": "Small Text",
+   "label": "Variables You Can Use",
+   "read_only": 1
+  },
+  {
+   "fieldname": "preview",
+   "fieldtype": "Button",
+   "label": "Preview With Latest Lead"
+  }
+ ],
+ "index_web_pages_for_search": 0,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-11-02 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AlphaX CRM",
+ "name": "AlphaX Email Rule",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "ASC",
+ "states": []
+}

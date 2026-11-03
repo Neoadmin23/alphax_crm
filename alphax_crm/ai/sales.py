@@ -163,9 +163,8 @@ def next_best_action(lead_name: str, language=None) -> dict:
 		# spec C: the AI only writes AI fields, timeline notes and notifications
 		from alphax_crm.crm.automation import notify
 
-		notify("WF-07 AI next best action", [owner], _("AI next best action for {0}").format(lead.name),
-			text, lead=lead.name, email=False, respect_hours=False,
-			key=f"WF-07 nba|{lead.name}|{now_datetime().isoformat()}")
+		notify("WF-07 AI next best action", [owner], lead=lead.name, email=False, respect_hours=False,
+			key=f"WF-07 nba|{lead.name}|{now_datetime().isoformat()}", context={"action": text})
 	return {**values, "summary": summary}
 
 
@@ -563,9 +562,9 @@ def detect_intent(communication, lead):
 	auto.system_comment("Lead", lead, f"AlphaX AI: inbound email intent = {label}"
 		+ (f'; suggested stage "{suggested}" (needs your confirmation)' if suggested else ""))
 	owner = frappe.db.get_value("Lead", lead, "lead_owner") or frappe.db.get_value("Lead", lead, "owner")
-	auto.notify("WF-07 AI intent detected", [owner], _("Client email on {0}: {1}").format(lead, INTENT_LABELS[intent]),
-		label + (("\n\n" + _('Suggested stage: **{0}**. Open the Lead and use "Apply Suggested Stage" to confirm.').format(suggested))
-			if suggested else ""), lead=lead, email=False, respect_hours=False, key=f"WF-07 intent|{communication}")
+	auto.notify("WF-07 AI intent detected", [owner], lead=lead, email=False, respect_hours=False,
+		key=f"WF-07 intent|{communication}",
+		context={"intent": INTENT_LABELS[intent], "detail": label, "suggested_stage": suggested or ""})
 	frappe.db.commit()
 	return {"intent": intent, "confidence": conf, "suggested_stage": suggested}
 
