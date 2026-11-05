@@ -1,22 +1,18 @@
-"""Lead Data Quality Monitor.
-
-Lead data-quality, aging, and follow-up health report for the Lead doctype.
-"""
-
 import frappe
 
 
 def execute(filters=None):
     filters = filters or {}
+
     filters["min_dq"] = filters.get("min_dq") if filters.get("min_dq") not in (None, "") else filters.get("dq_from")
     filters["max_dq"] = filters.get("max_dq") if filters.get("max_dq") not in (None, "") else filters.get("dq_to")
     MIN_IDLE = frappe.utils.cint(filters.get("idle_days"))
 
-    # The live site may carry a separate "Lead Status" custom field. When it
-    # does not, fall back to the native Lead.status field so the report does
-    # not depend on a Custom Field that the app does not own.
-    HAS_CUSTOM_LEAD_STATUS = frappe.get_meta("Lead").has_field("custom_lead_status")
-    LEAD_STATUS_FIELD = "custom_lead_status" if HAS_CUSTOM_LEAD_STATUS else "status"
+    # ------------------------------------------------------------
+    # Who is looking + how to present: own leads get priority, nothing is hidden
+    # ------------------------------------------------------------
+    SESSION_USER = frappe.session.user
+    SCOPE = filters.get("scope") or "My Leads First"      # My Leads First | My Leads Only | All Leads
 
     # ============================================================
     # CONFIG
@@ -24,7 +20,7 @@ def execute(filters=None):
 
     STALE_IDLE_DAYS = frappe.utils.cint(filters.get("stale_after_days")) or 14   # idle threshold for "Stale"
     CLOSED_STAGES = ["Converted", "Lost Quotation", "Lost with reason", "Do Not Contact"]   # Lead Stage values = closed
-    CLOSED_STATUSES = ["Inactive Lead"] if HAS_CUSTOM_LEAD_STATUS else []                   # Lead Status values = closed
+    CLOSED_STATUSES = ["Inactive Lead"]                                                     # Lead Status values = closed
     LOW_DQ = 50                                                     # DQ % below this = "Low"
 
     # bucket label -> (min_age, max_age)  (None = open-ended)
@@ -47,17 +43,16 @@ def execute(filters=None):
 
     columns = [
         {"label": "Lead", "fieldname": "name", "fieldtype": "Link", "options": "Lead", "width": 170},
+        {"label": "Mine", "fieldname": "is_mine", "fieldtype": "Data", "width": 55},
         {"label": "Created Date", "fieldname": "creation", "fieldtype": "Datetime", "width": 150},
         {"label": "Lead Name", "fieldname": "lead_name", "fieldtype": "Data", "width": 180},
         {"label": "Company", "fieldname": "company_name", "fieldtype": "Data", "width": 200},
         {"label": "Source", "fieldname": "source", "fieldtype": "Link", "options": "Lead Source", "width": 120},
         {"label": "Lead Owner", "fieldname": "lead_owner", "fieldtype": "Link", "options": "User", "width": 180},
+        # {"label": "Lead Status", "fieldname": "status", "fieldtype":""}
         {"label": "Workflow State", "fieldname": "workflow_state", "fieldtype": "Data", "width": 150},
-        {"label": "Lead Status", "fieldname": "lead_status", "fieldtype": "Data", "width": 130},
-    ]
-    if HAS_CUSTOM_LEAD_STATUS:
-        columns.append({"label": "Lead Stage", "fieldname": "status", "fieldtype": "Data", "width": 140})
-    columns += [
+        {"label": "Lead Status", "fieldname": "custom_lead_status", "fieldtype": "Data", "width": 130},
+        {"label": "Lead Stage", "fieldname": "status", "fieldtype": "Options", "width": 140},
         {"label": "Data Quality %", "fieldname": "alphax_dq_score", "fieldtype": "Percent", "width": 120},
         {"label": "DQ Level", "fieldname": "dq_level", "fieldtype": "Data", "width": 90},
         {"label": "Lead Age (Days)", "fieldname": "lead_age_days", "fieldtype": "Int", "width": 120},
@@ -70,7 +65,7 @@ def execute(filters=None):
 
 
     # ============================================================
-    # FILTER CONDITIONS (all parameterised)
+    # filters CONDITIONS (all parameterised)
     # ============================================================
 
     conditions = []
@@ -92,6 +87,10 @@ def execute(filters=None):
         conditions.append("creation < %(to_date_next)s")
         values["to_date_next"] = frappe.utils.add_days(filters.get("to_date"), 1)
 
+    if SCOPE == "My Leads Only":
+        conditions.append("lead_owner = %(scope_user)s")
+        values["scope_user"] = SESSION_USER
+
     if filters.get("lead_owner"):
         conditions.append("lead_owner = %(lead_owner)s")
         values["lead_owner"] = filters.get("lead_owner")
@@ -100,13 +99,15 @@ def execute(filters=None):
         conditions.append("workflow_state = %(workflow_state)s")
         values["workflow_state"] = filters.get("workflow_state")
 
+    # Lead Status
     if filters.get("lead_status"):
-        conditions.append(f"{LEAD_STATUS_FIELD} = %(lead_status)s")
+        conditions.append("custom_lead_status = %(lead_status)s")
         values["lead_status"] = filters.get("lead_status")
 
-    if HAS_CUSTOM_LEAD_STATUS and filters.get("lead_stage"):
-        conditions.append("status = %(lead_stage)s")
-        values["lead_stage"] = filters.get("lead_stage")
+    # Lead Stage
+    if filters.get("status"):
+        conditions.append("status = %(status)s")
+        values["status"] = filters.get("status")
 
     if filters.get("source"):
         conditions.append("source = %(source)s")
@@ -126,7 +127,7 @@ def execute(filters=None):
         conditions.append("IFNULL(alphax_dq_score, 0) <= %(max_dq)s")
         values["max_dq"] = frappe.utils.flt(filters.get("max_dq"))
 
-    # Aging bucket pushed into SQL (instead of filtering in Python after the fact)
+    # Aging bucket pushed into SQL (instead of filtersing in Python after the fact)
     if filters.get("aging_bucket") in BUCKET_MAP:
         bucket_range = BUCKET_MAP[filters.get("aging_bucket")]
         lo = bucket_range[0]
@@ -145,10 +146,10 @@ def execute(filters=None):
     # ============================================================
 
     rows = frappe.db.sql(
-        f"""
+        """
         SELECT
             name, creation, modified, lead_name, company_name, source,
-            lead_owner, workflow_state, {LEAD_STATUS_FIELD} AS lead_status, status,
+            lead_owner, workflow_state, custom_lead_status, status,
             IFNULL(alphax_dq_score, 0) AS alphax_dq_score,
             alphax_last_activity,
             alphax_idle_days,
@@ -176,6 +177,9 @@ def execute(filters=None):
     total_dq = 0
     stale_count = 0
     low_dq_count = 0
+    my_count = 0
+    health_counts = {"Critical": 0, "Stale": 0, "Active": 0, "Closed": 0}
+    HEALTH_filters = filters.get("followup_health") or ""
 
     for row in rows:
         age = frappe.utils.cint(row.get("lead_age_days"))
@@ -193,12 +197,18 @@ def execute(filters=None):
         idle = frappe.utils.cint(idle) if idle is not None else frappe.utils.cint(row.get("fallback_idle_days"))
         row["alphax_idle_days"] = idle
 
+        # Own-lead marker
+        if row.get("lead_owner") == SESSION_USER:
+            row["is_mine"] = "\u2605"
+        else:
+            row["is_mine"] = ""
+
         # Data quality level
         dq = frappe.utils.flt(row.get("alphax_dq_score"))
         row["dq_level"] = "High" if dq >= 80 else ("Medium" if dq >= LOW_DQ else "Low")
 
         # Follow-up health
-        is_open = (row.get("status") not in CLOSED_STAGES) and (row.get("lead_status") not in CLOSED_STATUSES)
+        is_open = (row.get("status") not in CLOSED_STAGES) and (row.get("custom_lead_status") not in CLOSED_STATUSES)
         if not is_open:
             row["followup_health"] = "Closed"
         elif idle > STALE_IDLE_DAYS * 2:
@@ -212,12 +222,24 @@ def execute(filters=None):
         if frappe.utils.cint(filters.get("open_only")) and not is_open:
             continue
 
-        # Minimum idle days filter
+        # Minimum idle days filters
         if MIN_IDLE and idle < MIN_IDLE:
             continue
 
-        # Optional "stale only" filter
-        if frappe.utils.cint(filters.get("stale_only")) and row["followup_health"] not in ("Stale", "Critical"):
+        # Count by follow-up health across everything the OTHER filters let through,
+        # so the cards show "how many Critical" even before Critical is selected
+        hc = row["followup_health"]
+        health_counts[hc] = health_counts[hc] + 1
+
+        # Follow-up Health filters
+        if HEALTH_filters == "Stale or Critical":
+            if hc not in ("Stale", "Critical"):
+                continue
+        elif HEALTH_filters and hc != HEALTH_filters:
+            continue
+
+        # Older "stale only" checkbox (kept so saved filters still work)
+        if frappe.utils.cint(filters.get("stale_only")) and hc not in ("Stale", "Critical"):
             continue
 
         # Aggregates
@@ -231,7 +253,22 @@ def execute(filters=None):
         if dq < LOW_DQ:
             low_dq_count += 1
 
+        if row.get("lead_owner") == SESSION_USER:
+            my_count += 1
+
         report_rows.append(row)
+
+
+    # Own leads first (everyone else's leads follow, nothing is hidden)
+    if SCOPE == "My Leads First":
+        mine_rows = []
+        other_rows = []
+        for r in report_rows:
+            if r.get("lead_owner") == SESSION_USER:
+                mine_rows.append(r)
+            else:
+                other_rows.append(r)
+        report_rows = mine_rows + other_rows
 
 
     # ============================================================
@@ -242,15 +279,22 @@ def execute(filters=None):
     avg_age = round(total_age / total, 1) if total else 0
     avg_dq = round(total_dq / total, 1) if total else 0
 
+    shown_label = "Leads Shown" + (" (" + HEALTH_filters + ")" if HEALTH_filters else "")
+
     report_summary = [
-        {"value": total, "label": "Total Leads", "datatype": "Int", "indicator": "Blue"},
+        {"value": total, "label": shown_label, "datatype": "Int", "indicator": "Blue"},
+        {"value": my_count, "label": "My Leads", "datatype": "Int", "indicator": "Blue"},
+        {"value": health_counts["Critical"], "label": "Critical", "datatype": "Int",
+        "indicator": "Red" if health_counts["Critical"] else "Green"},
+        {"value": health_counts["Stale"], "label": "Stale", "datatype": "Int",
+        "indicator": "Orange" if health_counts["Stale"] else "Green"},
+        {"value": health_counts["Active"], "label": "Active", "datatype": "Int", "indicator": "Green"},
+        {"value": health_counts["Closed"], "label": "Closed", "datatype": "Int", "indicator": "Grey"},
         {"value": avg_age, "label": "Avg Lead Age (Days)", "datatype": "Float", "indicator": "Orange"},
         {"value": avg_dq, "label": "Avg Data Quality %", "datatype": "Percent",
-         "indicator": "Green" if avg_dq >= 80 else ("Orange" if avg_dq >= LOW_DQ else "Red")},
-        {"value": stale_count, "label": "Stale / Critical Leads", "datatype": "Int",
-         "indicator": "Red" if stale_count else "Green"},
+        "indicator": "Green" if avg_dq >= 80 else ("Orange" if avg_dq >= LOW_DQ else "Red")},
         {"value": low_dq_count, "label": "Low Data Quality (<" + str(LOW_DQ) + "%)", "datatype": "Int",
-         "indicator": "Red" if low_dq_count else "Green"},
+        "indicator": "Red" if low_dq_count else "Green"},
     ]
 
     chart_labels = []
@@ -279,4 +323,3 @@ def execute(filters=None):
     # ============================================================
 
     data = columns, report_rows, message, chart, report_summary
-    return data
