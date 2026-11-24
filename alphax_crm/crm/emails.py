@@ -41,10 +41,11 @@ RULES = [
 			"<p><strong>Name:</strong> {{ lead_name }}<br><strong>Source:</strong> {{ source }}<br>"
 			"<strong>Score:</strong> {{ score }}</p><p>Respond quickly: speed-to-lead drives conversion.</p>" + _OPEN,
 		vars="source, score"),
-	dict(key="Follow-up due", to="Lead Owner", when="The Lead's Next Contact Date is reached (08:00, working days)", email=1,
+	dict(key="Follow-up due", to="Lead Owner + the agent who logged the follow-up", when="The Lead's Next Contact Date is reached (08:00, working days)", email=1,
 		subject="Follow-up due for {{ lead_name }}",
-		body="<p>The Next Contact Date for Lead {{ lead.name }} ({{ lead_name }}) is {{ due }}.</p>" + _OPEN,
-		vars="due"),
+		body="<p>The Next Contact Date for Lead {{ lead.name }} ({{ lead_name }}) is {{ due }}.</p>"
+			"{% if next_action %}<p>Next action: {{ next_action }}</p>{% endif %}" + _OPEN,
+		vars="due, next_action"),
 	dict(key="WF-02 Quotation created", to="Approvers (Sales Managers)", when="An agent creates a quotation", email=1,
 		subject="Quotation {{ quotation_no }} created by {{ created_by }}",
 		body=_QUOTATION_TABLE + _OPEN, vars=QUOTATION_VARS + ", created_by"),
@@ -87,6 +88,10 @@ RULES = [
 			"<strong>Lost Quotation</strong>. The Lead Owner confirms with the Confirm Lost Quotation button on the Lead or "
 			"Quotation.</p>" + _OPEN,
 		vars=QUOTATION_VARS + ", days_expired"),
+	dict(key="WF-04 Daily lost quotation", to="Approvers (Sales Managers)", when="Each working morning for every submitted Lost quotation",
+		email=1, subject="Lost quotation follow-up: {{ quotation_no }}",
+		body="<p>{{ party }} · {{ quotation_no }} · {{ amount }}</p><p>Reason: {{ reason }}</p>" + _OPEN,
+		vars=QUOTATION_VARS + ", reason"),
 	dict(key="WF-04 Lost quotation digest", to="Approvers (Sales Managers)", when="Daily at 08:00 on working days, when there are lost quotations",
 		email=1, subject="Lost quotations follow-up: {{ new_count }} new, {{ total }} total",
 		body="<p><strong>New since last working day: {{ new_count }}</strong></p>{{ new_leads_html }}"
@@ -102,19 +107,19 @@ RULES = [
 	dict(key="WF-05 Postponed follow-up", to="Lead Owner", when="A Postponed Lead's follow-up date is reached", email=1,
 		subject="Postponed Lead {{ lead.name }} is due for follow-up ({{ due }})",
 		body="<p>Lead {{ lead.name }} ({{ lead_name }}) was postponed to {{ due }}.</p>" + _OPEN, vars="due"),
-	dict(key="WF-05 Postponed overdue (approvers)", to="Lead Owner + Approvers", when="A Postponed Lead is overdue with no activity", email=1,
-		subject="Postponed Lead {{ lead.name }} overdue with no activity",
-		body="<p>Lead {{ lead.name }} ({{ lead_name }}) was due on {{ due }} and no comment or activity has been added since.</p>" + _OPEN,
+	dict(key="WF-05 Postponed overdue (approvers)", to="Lead Owner + Approvers", when="A Postponed Lead is overdue without a comment", email=1,
+		subject="Postponed Lead {{ lead.name }} overdue without a comment",
+		body="<p>Lead {{ lead.name }} ({{ lead_name }}) was due on {{ due }} and no comment has been added during this postponement.</p>" + _OPEN,
 		vars="due"),
 	dict(key="WF-05 Expected closing passed", to="Lead Owner + Approvers", when="Contract Under Signing and the Expected Closing Date has passed",
 		email=1, subject="Contract for Lead {{ lead.name }} not signed: expected closing {{ closing_date }} has passed",
 		body="<p>Lead {{ lead.name }} ({{ lead_name }}) is still at Contract Under Signing; the Expected Closing Date was "
 			"{{ closing_date }}.</p>" + _OPEN,
 		vars="closing_date"),
-	dict(key="WF-07 AI next best action", to="Lead Owner", when="The AI suggests a next action (when AI To Do is off)", email=0,
+	dict(key="WF-07 AI next best action", to="Lead Owner", when="The AI suggests a next action (when AI To Do is off)", email=1,
 		subject="AI next best action for {{ lead.name }}",
 		body="<p>{{ action }}</p>" + _OPEN, vars="action"),
-	dict(key="WF-07 AI intent detected", to="Lead Owner", when="The AI reads a client email and detects its intent", email=0,
+	dict(key="WF-07 AI intent detected", to="Lead Owner", when="The AI reads a client email and detects its intent", email=1,
 		subject="Client email on {{ lead.name }}: {{ intent }}",
 		body="<p>{{ detail }}</p>{% if suggested_stage %}<p>Suggested stage: <strong>{{ suggested_stage }}</strong>. Open the "
 			'Lead and use "Apply Suggested Stage" to confirm.</p>{% endif %}' + _OPEN,
@@ -137,6 +142,12 @@ def seed():
 		return
 	for rule in RULES:
 		name = template_name(rule["key"])
+		if rule["key"] == "WF-05 Postponed overdue (approvers)" and frappe.db.exists("Email Template", name):
+			old = frappe.get_doc("Email Template", name)
+			if old.subject == "Postponed Lead {{ lead.name }} overdue with no activity":
+				old.subject = rule["subject"]
+				old.response = (old.response or "").replace("no comment or activity has been added since", "no comment has been added during this postponement")
+				old.save(ignore_permissions=True)
 		if not frappe.db.exists("Email Template", name):
 			doc = frappe.new_doc("Email Template")
 			doc.name = name
@@ -151,6 +162,9 @@ def seed():
 		row = rows.get(rule["key"])
 		if not row:
 			row = settings.append(TABLE, {"rule": rule["key"], "enabled": 1, "send_email": rule["email"]})
+			changed = True
+		if rule["key"].startswith("WF-07") and not row.send_email:
+			row.send_email = 1
 			changed = True
 		info = {"recipients": rule["to"], "trigger": rule["when"],
 			"variables": ", ".join(v for v in (COMMON_VARS, rule["vars"]) if v)}

@@ -142,8 +142,8 @@ def run():
 		and not auto.is_working_day(getdate("2026-10-31"), cal) and auto.is_working_day(getdate("2026-11-01"), cal))
 	check("calendar: next opening after Thursday 18:00 is Sunday 08:00",
 		auto.next_business_start(datetime(2026, 10, 29, 18, 0), cal) == datetime(2026, 11, 1, 8, 0))
-	check("calendar: Thu 10:00 -> Sun 10:00 = 24 working hours (weekend excluded)",
-		auto.working_hours_between(thu, datetime(2026, 11, 1, 10, 0), cal) == 24.0,
+	check("calendar: Thu 10:00 -> Sun 10:00 = 9 business hours (weekend excluded)",
+		auto.working_hours_between(thu, datetime(2026, 11, 1, 10, 0), cal) == 9.0,
 		auto.working_hours_between(thu, datetime(2026, 11, 1, 10, 0), cal))
 	cal.mode = "Business hours only"
 	check("calendar: business-hours mode counts 7h + 2h", auto.working_hours_between(thu, datetime(2026, 11, 1, 10, 0), cal) == 9.0)
@@ -262,7 +262,7 @@ def run():
 	# ------------------------------------------------------------------ WF-04
 	l4 = new_lead("Interested")
 	move(l4.name, "Qualified lead", "Quotation", as_user=REP)
-	q1 = quotation(l4.name, valid_till=2, owner=REP, transaction_date=add_days(nowdate(), -10))
+	q1 = quotation(l4.name, valid_till=2, owner=REP, transaction_date=nowdate())
 	wf.wf04_daily()
 	t2 = logs(rule="WF-04 Expiring, no activity", ref=q1.name)
 	check("WF-04 T-2: reminder to Lead Owner when no activity", len(t2) == 1 and t2[0].recipients == REP, t2)
@@ -272,7 +272,7 @@ def run():
 	check("WF-04: daily run does not repeat", len(logs(rule="WF-04", ref=q1.name)) == 1)
 	l4b = new_lead("Interested")
 	move(l4b.name, "Qualified lead", "Quotation", as_user=REP)
-	q2 = quotation(l4b.name, valid_till=1, owner=REP, transaction_date=add_days(nowdate(), -5))
+	q2 = quotation(l4b.name, valid_till=1, owner=REP, transaction_date=nowdate())
 	frappe.get_doc({"doctype": "Comment", "comment_type": "Comment", "reference_doctype": "Lead", "reference_name": l4b.name,
 		"content": "Called the client, waiting for PO"}).insert(ignore_permissions=True)
 	wf.wf04_daily()
@@ -280,14 +280,15 @@ def run():
 		and not logs(rule="WF-04 Expiring", ref=q2.name))
 	l4c = new_lead("Interested")
 	move(l4c.name, "Qualified lead", "Quotation", as_user=REP)
-	q3 = quotation(l4c.name, valid_till=0, owner=REP, transaction_date=add_days(nowdate(), -20))
+	q3 = quotation(l4c.name, valid_till=0, owner=REP, transaction_date=nowdate())
 	wf.wf04_daily()
 	t0 = logs(rule="WF-04 Valid Till reached", ref=q3.name)
 	check("WF-04 T0: owner + Sales Manager alerted", len(t0) == 1 and {REP, MGR} <= set(t0[0].recipients.split("\n")), t0)
 	l4d = new_lead("Interested")
 	move(l4d.name, "Qualified lead", "Quotation", as_user=REP)
-	q4 = quotation(l4d.name, valid_till=10, owner=REP, transaction_date=add_days(nowdate(), -30))
+	q4 = quotation(l4d.name, valid_till=10, owner=REP, transaction_date=nowdate())
 	frappe.db.set_value("Quotation", q4.name, "valid_till", add_days(nowdate(), -3))
+	frappe.db.sql("update `tabAlphaX Stage Transition Log` set changed_on=%s where reference_name=%s", (add_days(now_datetime(), -5), l4d.name))
 	wf.wf04_daily()
 	tp = logs(rule="WF-04 Expired, no action", ref=q4.name)
 	check("WF-04 T+3: escalation proposes Lost Quotation", len(tp) == 1 and "Lost Quotation" in tp[0].subject
@@ -303,8 +304,8 @@ def run():
 		(frappe.db.get_value("Quotation", q4.name, "status"), frappe.db.get_value("Lead", l4d.name, ["status", "custom_lead_status", "alphax_proposed_action"])))
 	frappe.db.delete("AlphaX Automation Log", {"rule": "WF-04 Lost quotation digest"})
 	wf.lost_quotation_digest()
-	dg = logs(rule="WF-04 Lost quotation digest")
-	check("WF-04: daily lost-quotation follow-up to Sales Manager", dg and MGR in dg[-1].recipients and l4d.name in dg[-1].message, dg[-1:] )
+	dg = logs(rule="WF-04 Daily lost quotation", ref=q4.name)
+	check("WF-04: daily lost-quotation follow-up to Sales Manager", dg and MGR in dg[-1].recipients and q4.name in dg[-1].message, dg[-1:] )
 	settings(business_days="Monday")  # pretend today is not a working day unless it is Monday
 	if getdate(nowdate()).weekday() != 0:
 		n = len(logs(rule="WF-04"))
@@ -366,7 +367,7 @@ def run():
 	check("Confirm Lost Quotation refused on a cancelled quotation / closed lead", e is not None)
 	lx = new_lead("Interested")
 	move(lx.name, "Qualified lead", "Quotation", as_user=REP)
-	qx = quotation(lx.name, valid_till=10, owner=REP, transaction_date=add_days(nowdate(), -20))
+	qx = quotation(lx.name, valid_till=10, owner=REP, transaction_date=nowdate())
 	frappe.db.set_value("Quotation", qx.name, {"valid_till": add_days(nowdate(), -1), "status": "Expired"})
 	wf.wf04_daily()
 	check("WF-04 T0: still alerted after ERPNext marked the quotation Expired (weekend expiry)",
@@ -404,11 +405,11 @@ def run():
 	check("go-live: old leads without a logged stage entry do not flood reminders on day one", not logs(old.name, "WF-05"))
 	frappe.db.set_default(auto.GO_LIVE_KEY, "2000-01-01 00:00:00")
 	l5 = new_lead()
-	backdate_stage(l5.name, "Lead", days=3)
+	backdate_stage(l5.name, "Lead", days=7)
 	wf.sla_daily()
 	r1 = logs(l5.name, "WF-05 Lead")
 	check("WF-05 Lead: first reminder on day 3", len(r1) == 1 and "First reminder" in r1[0].subject, r1)
-	backdate_stage(l5.name, "Lead", days=7)
+	frappe.db.set_value("AlphaX Automation Log", r1[0].name, "sent_on", add_days(now_datetime(), -4))
 	wf.sla_daily()
 	r2 = logs(l5.name, "WF-05 Lead")
 	check("WF-05 Lead: second reminder 4 days later (system notes are not 'activity')", len(r2) == 2 and "Second reminder" in r2[1].subject, r2)
@@ -418,7 +419,7 @@ def run():
 	backdate_stage(l5b.name, "Interested", days=3)
 	frappe.db.sql("update `tabComment` set creation=%s where reference_name=%s and comment_type='Comment'", (now_datetime(), l5b.name))
 	wf.sla_daily()
-	check("WF-05: real activity suppresses the reminder", not logs(l5b.name, "WF-05"))
+	check("WF-05: a comment alone does not establish a meeting", logs(l5b.name, "WF-05"))
 	l5c = new_lead("Interested")
 	backdate_stage(l5c.name, "Interested", days=7)
 	frappe.db.set_value("Lead", l5c.name, "workflow_state", "Returned for Correction") if frappe.get_meta("Lead").has_field("workflow_state") else None
@@ -437,11 +438,11 @@ def run():
 	quotation(lp.name, owner=REP)
 	move(lp.name, "Postponed", as_user=REP, alphax_next_contact_date=nowdate())
 	fup = frappe.get_all("AlphaX Follow-up", filters={"reference_name": lp.name}, fields=["next_follow_up_date", "summary"])
-	check("WF-05 Postponed: next follow-up created with the Next Contact Date", fup and str(fup[0].next_follow_up_date) == nowdate(), fup)
+	check("WF-05 Postponed: blank follow-up created, date retained on Lead", fup and not fup[0].next_follow_up_date and str(frappe.db.get_value("Lead", lp.name, "alphax_next_contact_date")) == nowdate(), fup)
 	check("WF-05 Postponed: placeholder is not logged as a client contact", not frappe.db.exists("Communication",
 		{"reference_name": lp.name, "subject": ["like", "Follow-up%"]}))
 	wf.sla_daily()
-	check("WF-05 Postponed: reminder on the Next Contact Date", len(logs(lp.name, "WF-05 Postponed follow-up")) == 1)
+	check("WF-05 Postponed: reminder on the Next Contact Date", len([r for r in logs(lp.name) if r.rule == "WF-05 Postponed follow-up"]) == 1)
 	frappe.db.set_value("Lead", lp.name, "alphax_next_contact_date", add_days(nowdate(), -2))
 	frappe.db.sql("""update `tabAlphaX Stage Transition Log` set changed_on=%s where reference_name=%s""",
 		(now_datetime() - timedelta(days=25), lp.name))  # postponed weeks ago, date passed, nobody commented

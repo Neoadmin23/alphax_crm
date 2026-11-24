@@ -19,6 +19,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, time, timedelta
 
 import frappe
@@ -170,7 +172,7 @@ def working_days_between(start, end, cal=None) -> int:
 
 # ============================================================================ recipients
 def user_emails(users):
-	users = [u for u in set(users or []) if u and u not in ("Guest", "Administrator")]
+	users = [u for u in set(users or []) if u and u != "Guest"]
 	if not users:
 		return {}
 	rows = frappe.get_all("User", filters={"name": ["in", users], "enabled": 1}, fields=["name", "email"])
@@ -198,6 +200,11 @@ def make_key(rule, lead=None, reference=None, trigger_date=None):
 	return f"{rule}|{lead or '-'}|{ref}|{getdate(trigger_date) if trigger_date else getdate()}"
 
 
+def notification_identity(rule, lead, reference, trigger_date, milestone=None):
+	parts = [lead, [rule, milestone], list(reference) if reference else None, str(getdate(trigger_date))]
+	return hashlib.sha256(json.dumps(parts, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+
+
 def already_done(key) -> bool:
 	return bool(frappe.db.exists(LOG_DT, {"dedupe_key": key}))
 
@@ -213,8 +220,10 @@ def notify(rule, recipients, subject=None, message=None, lead=None, reference=No
 	from alphax_crm.crm import emails
 
 	settings = get_settings()
+	milestone = key.partition("|")[0] if key else None
+	identity = notification_identity(rule, lead, reference, trigger_date, milestone)
 	key = key or make_key(rule, lead, reference, trigger_date)
-	if already_done(key):
+	if already_done(key) or frappe.db.exists(LOG_DT, {"notification_identity": identity}):
 		return None
 	built = emails.build(template or rule, context, lead=lead, reference=reference, settings=settings)
 	if built is not None:
@@ -251,6 +260,7 @@ def notify(rule, recipients, subject=None, message=None, lead=None, reference=No
 		log.result = _("No recipients (check Lead Owner / Approver role users)")
 		log.insert(ignore_permissions=True)
 		return log.name
+	log.notification_identity = identity
 	cal = calendar(settings)
 	if respect_hours and cint(settings.get("business_hours_only", 1)) and not is_business_time(None, cal):
 		log.send_after = next_business_start(None, cal)
@@ -264,52 +274,35 @@ def notify(rule, recipients, subject=None, message=None, lead=None, reference=No
 
 def deliver(log):
 	"""Send one queued AlphaX Automation Log: in-app + email (timeline) + system comment."""
-	if isinstance(log, str):
-		log = frappe.get_doc(LOG_DT, log)
-	users = [u for u in (log.recipients or "").split("\n") if u]
-	ref_dt, ref_name = log.reference_doctype or ("Lead" if log.lead else None), log.reference_name or log.lead
-	results = []
-	for user in users:
-		if user == "Administrator":
-			continue
-		try:
-			frappe.get_doc({"doctype": "Notification Log", "subject": log.subject, "for_user": user, "type": "Alert",
-				"email_content": frappe.utils.markdown(log.message or ""), "document_type": ref_dt,
-				"document_name": ref_name, "from_user": "Administrator"}).insert(ignore_permissions=True)
-		except Exception:
-			log_error("automation in-app notification")
-	results.append(_("in-app: {0}").format(len(users)))
-
-	if log.send_email:
-		emails = list(user_emails(users).values())
-		if emails:
-			try:
-				comm = _send_email(log, emails)
-				log.communication = comm
-				results.append(_("email: {0}").format(len(emails)))
-			except Exception as e:
-				results.append(_("email failed: {0}").format(str(e)[:160]))
-				log.status = "Partly Sent"
-	if log.log_on_timeline and log.lead and frappe.db.exists("Lead", log.lead):
-		system_comment("Lead", log.lead, f"AlphaX [{log.rule}]: {log.subject} → {', '.join(users)}")
-	if log.status != "Partly Sent":
-		log.status = "Sent"
-	log.sent_on = now_datetime()
-	log.result = "; ".join(results)
-	log.save(ignore_permissions=True)
+	name = log if isinstance(log, str) else log.name
+	state = frappe.db.sql("select status from `tabAlphaX Automation Log` where name=%s for update", (name,))
+	if not state or state[0][0] != "Queued":
+		return
+	log = frappe.get_doc(LOG_DT, name)
+	if log.rule.startswith("WF-02 No quotation") and (frappe.db.get_value("Lead", log.lead, "status") != "Quotation"
+			or quotations_for_lead(log.lead, {"docstatus": ["<", 2]})):
+		frappe.db.set_value(LOG_DT, name, {"status": "Skipped", "result": _("Quotation requirement already resolved")})
+		return
+	if log.lead and log.rule.startswith(("WF-02 No quotation", "WF-04", "WF-05", "Follow-up due")) and is_paused(log.lead):
+		frappe.db.set_value(LOG_DT, log.name, "send_after", next_business_start(now_datetime() + timedelta(days=1)))
+		return
+	from alphax_crm.crm.delivery import deliver_channels
+	deliver_channels(log)
 
 
 def _send_email(log, emails):
 	content = frappe.utils.markdown(log.message or "")
-	if log.lead and frappe.db.exists("Lead", log.lead) and log.log_on_timeline:
+	if (log.lead and log.log_on_timeline) or (log.reference_doctype and log.reference_name):
+		parent_dt, parent_name = ("Lead", log.lead) if log.lead and log.log_on_timeline else (log.reference_doctype, log.reference_name)
 		comm = frappe.get_doc({
 			"doctype": "Communication", "communication_type": "Automated Message", "communication_medium": "Email",
 			"sent_or_received": "Sent", "subject": log.subject, "content": content,
-			"recipients": ", ".join(emails), "reference_doctype": "Lead", "reference_name": log.lead,
+			"recipients": ", ".join(emails), "reference_doctype": parent_dt, "reference_name": parent_name,
 			"timeline_links": ([{"link_doctype": log.reference_doctype, "link_name": log.reference_name}]
-				if log.reference_doctype and log.reference_doctype != "Lead" and log.reference_name else []),
+				if log.reference_doctype and log.reference_doctype != parent_dt and log.reference_name else []),
 		}).insert(ignore_permissions=True)
-		comm.send_email()
+		frappe.sendmail(recipients=emails, subject=log.subject, message=content, communication=comm.name,
+			reference_doctype=parent_dt, reference_name=parent_name, now=False)
 		return comm.name
 	frappe.sendmail(recipients=emails, subject=log.subject, message=content,
 		reference_doctype=log.reference_doctype, reference_name=log.reference_name, now=False)
@@ -366,7 +359,8 @@ def is_system_text(text) -> bool:
 def is_paused(lead_name) -> bool:
 	"""Reminders pause while the Lead is 'Returned for Correction' (approval workflow)."""
 	meta = frappe.get_meta("Lead")
-	for field in ("workflow_state", "alphax_review_status"):
+	from alphax_crm.crm.utils import active_lead_workflow_field
+	for field in filter(None, (active_lead_workflow_field(), "workflow_state", "alphax_review_status")):
 		if meta.has_field(field) and frappe.db.get_value("Lead", lead_name, field) == PAUSED_STATE:
 			return True
 	return False
@@ -376,29 +370,32 @@ def activity_since(lead_name, since, extra_refs=(), ignore_stage_to=()) -> list[
 	"""Which qualifying activities happened on the Lead (and linked docs) after `since`.
 	Returns a list of activity kinds found (empty = no activity)."""
 	since = get_datetime(since)
-	refs = [("Lead", lead_name)] + [r for r in extra_refs if r and r[1]]
+	refs = ([("Lead", lead_name)] if lead_name else []) + [r for r in extra_refs if r and r[1]]
 	found = []
 	for dt, dn in refs:
 		comms = frappe.get_all("Communication", filters={"reference_doctype": dt, "reference_name": dn,
-			"communication_type": "Communication", "creation": (">", since)}, fields=["sent_or_received"], limit=5)
+			"communication_type": "Communication", "communication_medium": "Email", "creation": (">", since)}, fields=["sent_or_received"], limit=5)
 		if comms:
 			found.append("email")
 		for c in frappe.get_all("Comment", filters={"reference_doctype": dt, "reference_name": dn,
-				"comment_type": "Comment", "creation": (">", since)}, fields=["content"], limit=20):
+				"comment_type": "Comment", "creation": (">", since)}, fields=["content"]):
 			if not is_system_text(c.content):
 				found.append("comment")
 				break
 		if frappe.db.count("ToDo", {"reference_type": dt, "reference_name": dn, "status": "Closed",
 				"modified": (">", since)}):
 			found.append("closed todo")
+	if not lead_name:
+		return sorted(set(found))
 	if frappe.db.table_exists("AlphaX Follow-up") and frappe.db.count("AlphaX Follow-up", {
 			"reference_doctype": "Lead", "reference_name": lead_name, "creation": (">", since),
 			"summary": ("not like", "AlphaX:%")}):
 		found.append("follow-up")
 	events = frappe.db.sql("""select count(*) from `tabEvent Participants` ep join `tabEvent` e on e.name = ep.parent
-		where ep.reference_doctype='Lead' and ep.reference_docname=%s and (e.creation > %s or e.starts_on > %s)""",
+		where ep.reference_doctype='Lead' and ep.reference_docname=%s and e.status != 'Cancelled' and (e.creation > %s or e.starts_on > %s)""",
 		(lead_name, since, since))[0][0]
-	if events:
+	if events or frappe.db.exists("AlphaX Follow-up", {"reference_doctype": "Lead", "reference_name": lead_name,
+			"channel": "Meeting", "follow_up_datetime": (">", since)}):
 		found.append("meeting")
 	if frappe.db.table_exists("CRM Note") and frappe.db.count("CRM Note", {"parenttype": "Lead", "parent": lead_name,
 			"added_on": (">", since)}):
@@ -428,7 +425,9 @@ def quotations_for_lead(lead_name, filters=None, fields=("name",)):
 		or_names |= set(frappe.get_all("Quotation", filters={**filters, "opportunity": ["in", opps]}, pluck="name"))
 	if not or_names:
 		return []
-	return frappe.get_all("Quotation", filters={"name": ["in", list(or_names)]}, fields=list(fields), order_by="creation desc")
+	rows = frappe.get_all("Quotation", filters={"name": ["in", list(or_names)]},
+		fields=list(dict.fromkeys([*fields, "quotation_to", "party_name", "opportunity"])), order_by="creation desc")
+	return [frappe._dict({f: row.get(f) for f in fields}) for row in rows if lead_for_quotation(row) == lead_name]
 
 
 def lead_for_quotation(q) -> str | None:
@@ -470,3 +469,26 @@ def last_logged_stage(lead_name):
 	"""The Lead Stage AlphaX last recorded (used when ERPNext core rewrote the stage in SQL)."""
 	return frappe.db.get_value("AlphaX Stage Transition Log", {"reference_doctype": "Lead",
 		"reference_name": lead_name, "field_label": "Lead Stage"}, "to_value", order_by="changed_on desc")
+
+
+def latest_lead_activity(lead, anchor):
+	"""Include milestones that have no Lead on_update hook in the daily idle calculation."""
+	times = [get_datetime(anchor)]
+	for dt, filters, field in (
+		("ToDo", {"reference_type": "Lead", "reference_name": lead, "status": "Closed"}, "modified"),
+		("CRM Note", {"parenttype": "Lead", "parent": lead}, "added_on"),
+		("AlphaX Stage Transition Log", {"reference_doctype": "Lead", "reference_name": lead,
+			"field_label": "Lead Stage"}, "changed_on"),
+	):
+		if not frappe.db.table_exists(dt):
+			continue
+		timestamp = frappe.db.get_value(dt, filters, field, order_by=f"{field} desc")
+		if timestamp:
+			times.append(get_datetime(timestamp))
+	events = frappe.db.sql("""select max(greatest(e.creation, case when e.starts_on <= %s then e.starts_on
+		else e.creation end)) from `tabEvent Participants` ep join `tabEvent` e on e.name=ep.parent
+		where ep.reference_doctype='Lead' and ep.reference_docname=%s and e.status != 'Cancelled'""",
+		(now_datetime(), lead))
+	if events and events[0][0]:
+		times.append(get_datetime(events[0][0]))
+	return max(times)

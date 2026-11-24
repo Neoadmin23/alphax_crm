@@ -47,6 +47,10 @@ function alphax_wf_refresh(frm) {
         notes.push(["blue", `✦ ${__("AI suggests moving this Lead to")} <b>${frappe.utils.escape_html(frm.doc.alphax_ai_suggested_stage)}</b>
             — ${frappe.utils.escape_html((frm.doc.alphax_ai_intent || "").split(" — ")[0])}. ${__("Use AlphaX AI → Apply Suggested Stage to confirm.")}`]);
     }
+    if (["Both", "Lead form"].includes(window.alphax_postponed_mode())) {
+        const s = window.alphax_postponed_state(frm.doc);
+        if (s) notes.unshift([s.banner, `${s.key === "overdue" ? "⚠ " : ""}${frappe.utils.escape_html(s.text)}`]);
+    }
     notes.forEach(([color, html]) => {
         $(`<div class="ax-wf-banner form-message ${color}" style="margin-bottom:8px"><div>${html}</div></div>`).prependTo(frm.layout.wrapper);
     });
@@ -71,6 +75,7 @@ function alphax_wf_postponed_prompt(frm) {
                 return;
             }
             frm.set_value("alphax_next_contact_date", v.date);
+            frm.set_value("alphax_confirmed_postpone_date", v.date);
             if (v.note && !frm.is_new()) frappe.xcall("frappe.desk.form.utils.add_comment", {
                 reference_doctype: "Lead", reference_name: frm.doc.name, content: frappe.utils.escape_html(v.note),
                 comment_email: frappe.session.user, comment_by: frappe.session.user_fullname,
@@ -212,8 +217,8 @@ function alphax_sales_ai_buttons(frm) {
                 { fieldname: "steps", fieldtype: "Int", label: __("Number of emails"), default: 3,
                   description: __("Sent on the days set in AlphaX CRM Settings, after you approve each one") },
                 { fieldname: "purpose", fieldtype: "Select", label: __("Purpose"), options: "Follow-up\nRe-engagement", default: "Follow-up" },
-                { fieldname: "language", fieldtype: "Select", label: __("Language"), options: "English\nArabic",
-                  default: frm.doc.language === "ar" ? "Arabic" : "English" },
+                { fieldname: "language", fieldtype: "Select", label: __("Language"), options: "\nEnglish\nArabic",
+                  description: __("Leave blank to match the lead’s language.") },
                 { fieldname: "instruction", fieldtype: "Small Text", label: __("Anything to mention? (optional)") },
             ],
             primary_action_label: __("Create Drafts"),
@@ -238,7 +243,24 @@ function alphax_sales_ai_buttons(frm) {
         run("alphax_crm.ai.sales.api_lead_brief", { lead: frm.doc.name }, __("Summarising the history…"),
             () => frappe.show_alert({ message: __("AI brief updated"), indicator: "green" })), group);
 
+    if (frm.doc.alphax_nba_sources && frm.doc.alphax_nba_sources !== "[]") {
+        frm.add_custom_button(__("Next action evidence"), () => {
+            const list = $("<ul>");
+            JSON.parse(frm.doc.alphax_nba_sources).forEach(([dt, name]) => {
+                const link = $("<a>").text(dt + " · " + name).attr("href", frappe.utils.get_form_link(dt, name));
+                list.append($("<li>").append(link));
+            });
+            frappe.msgprint({title: __("Next action evidence"), message: list.prop("outerHTML")});
+        }, group);
+    }
+    if (frm.doc.alphax_intent_email) {
+        frm.add_custom_button(__("View intent source email"), () =>
+            frappe.set_route("Form", "Communication", frm.doc.alphax_intent_email), group);
+    }
     if (frm.doc.alphax_ai_suggested_stage) {
+        frm.add_custom_button(__("Dismiss stage suggestion"), () => frappe.confirm(
+            __("Dismiss this suggestion?"), () => run("alphax_crm.ai.sales.dismiss_intent",
+                {lead: frm.doc.name, expected_source: frm.doc.alphax_intent_email || "", expected_stage: frm.doc.alphax_ai_suggested_stage}, __("Saving…"))), group);
         frm.add_custom_button(__("Apply Suggested Stage ({0})", [__(frm.doc.alphax_ai_suggested_stage)]), () => {
             const stage = frm.doc.alphax_ai_suggested_stage;
             const wf = frappe.boot.alphax_workflow || {};
@@ -246,7 +268,7 @@ function alphax_sales_ai_buttons(frm) {
                 <p class="text-muted small">${frappe.utils.escape_html(frm.doc.alphax_ai_intent || "")}</p>` }];
             if (stage === wf.postponed) fields.push({ fieldname: "next_contact_date", fieldtype: "Date", label: __("Next Contact Date"), reqd: 1 });
             frappe.prompt(fields, (v) => run("alphax_crm.ai.sales.apply_suggested_stage",
-                { lead: frm.doc.name, next_contact_date: v.next_contact_date }, __("Updating…")), __("Confirm Stage"), __("Apply"));
+                { lead: frm.doc.name, next_contact_date: v.next_contact_date, expected_source: frm.doc.alphax_intent_email, expected_stage: stage }, __("Updating…")), __("Confirm Stage"), __("Apply"));
         }, group);
     }
 

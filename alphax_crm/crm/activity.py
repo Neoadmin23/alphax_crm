@@ -18,6 +18,7 @@ def log_call(reference_doctype, reference_name, call_type="Outgoing", status="Co
         frappe.throw(frappe._("{0} {1} not found.").format(reference_doctype, reference_name))
 
     doc = frappe.get_doc(reference_doctype, reference_name)
+    doc.check_permission("write")
     phone = doc.get("mobile_no") or doc.get("phone") or doc.get("contact_mobile") or ""
 
     secs = cint(duration)

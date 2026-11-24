@@ -51,7 +51,9 @@ def lead_language(lead_name) -> str:
 	"""Arabic or English, matching the lead: its language setting, else its own inbound messages."""
 	if not lead_name:
 		return get_settings().get("ai_email_language") or "English"
-	lang = (frappe.db.get_value("Lead", lead_name, "language") or "").lower()
+	lang = ((frappe.db.get_value("Lead", lead_name, "language") if frappe.get_meta("Lead").has_field("language") else "") or "").lower()
+	if lang.startswith("en"):
+		return "English"
 	if lang.startswith("ar"):
 		return "Arabic"
 	# the client's most recent message decides; then the inbound message captured at intake
@@ -72,9 +74,9 @@ def lead_context(lead) -> dict:
 		if (meta.has_field(f) or f in ("lead_name", "status")) and lead.get(f) not in (None, "", 0):
 			data[f] = pure.truncate(strip_html(str(lead.get(f))), 400)
 	activity = _activity("Lead", lead.name)
-	quotations = frappe.get_all("Quotation",
-		filters={"quotation_to": "Lead", "party_name": lead.name, "docstatus": 1},
-		fields=["name", "status", "grand_total", "currency", "valid_till"], order_by="creation desc", limit=5)
+	from alphax_crm.crm.automation import quotations_for_lead
+	quotations = quotations_for_lead(lead.name, {"docstatus": 1},
+		fields=["name", "status", "grand_total", "currency", "valid_till"])[:5]
 	last = activity[0]["date"] if activity else None
 	return {
 		"lead": data,
@@ -88,20 +90,20 @@ def _activity(ref_dt, ref_name, limit=12):
 	out = []
 	for c in frappe.get_all("Communication",
 			filters={"reference_doctype": ref_dt, "reference_name": ref_name, "communication_type": "Communication"},
-			fields=["communication_date", "sent_or_received", "subject", "content", "communication_medium"],
+			fields=["name","communication_date", "sent_or_received", "subject", "content", "communication_medium"],
 			order_by="communication_date desc", limit=limit):
-		out.append({"date": str(get_datetime(c.communication_date).date()), "direction": c.sent_or_received or "Sent",
+		out.append({"doctype": "Communication", "name": c.name, "date": str(get_datetime(c.communication_date)), "direction": c.sent_or_received or "Sent",
 			"subject": pure.truncate(c.subject or c.communication_medium or "", 80),
 			"excerpt": pure.truncate(strip_html(c.content or "").strip().replace("\n", " "), 220)})
 	if frappe.db.table_exists("AlphaX Follow-up"):
 		for f in frappe.get_all("AlphaX Follow-up", filters={"reference_doctype": ref_dt, "reference_name": ref_name},
-				fields=["follow_up_datetime", "channel", "outcome", "summary"], order_by="follow_up_datetime desc", limit=5):
-			out.append({"date": str(get_datetime(f.follow_up_datetime).date()), "direction": f"Follow-up ({f.channel})",
+				fields=["name","follow_up_datetime", "channel", "outcome", "summary"], order_by="follow_up_datetime desc", limit=5):
+			out.append({"doctype": "AlphaX Follow-up", "name": f.name, "date": str(get_datetime(f.follow_up_datetime)), "direction": f"Follow-up ({f.channel})",
 				"subject": f.outcome or "", "excerpt": pure.truncate(f.summary or "", 220)})
 	for n in frappe.get_all("Comment",
 			filters={"reference_doctype": ref_dt, "reference_name": ref_name, "comment_type": "Comment"},
-			fields=["creation", "content"], order_by="creation desc", limit=5):
-		out.append({"date": str(get_datetime(n.creation).date()), "direction": "Note", "subject": "Internal note",
+			fields=["name","creation", "content"], order_by="creation desc", limit=5):
+		out.append({"doctype": "Comment", "name": n.name, "date": str(get_datetime(n.creation)), "direction": "Note", "subject": "Internal note",
 			"excerpt": pure.truncate(strip_html(n.content or "").strip(), 220)})
 	out.sort(key=lambda a: a["date"], reverse=True)
 	return out[:limit]
@@ -127,6 +129,7 @@ NBA_SCHEMA = {
 		"channel": {"type": "string", "enum": ["Call", "Email", "WhatsApp", "Meeting", "Visit", "Other"]},
 		"in_days": {"type": "integer"},
 		"reasons": {"type": "array", "items": {"type": "string"}},
+		"evidence": {"type":"array","items":{"type":"integer"}},
 	},
 	"required": ["summary", "next_action", "channel", "in_days", "reasons"],
 }
@@ -140,7 +143,11 @@ def next_best_action(lead_name: str, language=None) -> dict:
 		"\nYou coach a B2B salesperson. Given the lead and its history, recommend the single most useful next step."
 		" Be concrete (who to contact, how, and what to say or send). Be strict: a lead with no engagement is not hot."
 		" in_days = when to do it (0-30). reasons = up to 3 short reasons.")
-	result = complete_json(system, f"Today is {nowdate()}.\n\n" + _context_text(ctx), schema=NBA_SCHEMA,
+	sources = [(r["doctype"],r["name"]) for r in ctx["activity"]] + [("Quotation",q["name"]) for q in ctx["quotations"]]
+	source_list = "\n".join(f"{i}. {dt} {name}" for i,(dt,name) in enumerate(sources,1))
+	activity_ids = "\n".join(f"{i}. {r['date']} {r['subject']} {r['excerpt']}" for i,r in enumerate(ctx["activity"],1))
+	request = _context_text(ctx) + "\nNumbered source records:\n" + source_list + "\nNumbered activity:\n" + activity_ids
+	result = complete_json(system + " Return the integer IDs of source records used in evidence.", f"Today is {nowdate()}.\n{request}", schema=NBA_SCHEMA,
 		feature="lead_next_action", reference=("Lead", lead.name), max_tokens=700)
 	in_days = pure.clamp(result.get("in_days", 2), 0, 30)
 	action = pure.truncate(str(result.get("next_action") or "").strip(), 300)
@@ -148,6 +155,7 @@ def next_best_action(lead_name: str, language=None) -> dict:
 	reasons = [str(r) for r in (result.get("reasons") or [])][:3]
 	text = (f"[{channel}] " if channel else "") + action
 	values = {
+		"alphax_nba_sources": frappe.as_json([sources[i-1] for i in dict.fromkeys(i for i in (result.get("evidence") or []) if type(i) is int and 1 <= i <= len(sources))][:5]),
 		"alphax_ai_next_action": text + ("\n" + "\n".join(f"• {r}" for r in reasons) if reasons else ""),
 		"alphax_ai_next_action_date": add_days(nowdate(), in_days),
 		"alphax_ai_last_run": now_datetime(),
@@ -157,26 +165,12 @@ def next_best_action(lead_name: str, language=None) -> dict:
 		values["alphax_ai_brief"] = summary
 	frappe.db.set_value("Lead", lead.name, values, update_modified=False)
 	owner = lead.get("lead_owner") or lead.owner
-	if action and cint(settings.get("ai_next_action_todo")):
-		_refresh_todo("Lead", lead.name, owner, text, values["alphax_ai_next_action_date"])
-	elif action:
-		# spec C: the AI only writes AI fields, timeline notes and notifications
+	if action:
 		from alphax_crm.crm.automation import notify
 
-		notify("WF-07 AI next best action", [owner], lead=lead.name, email=False, respect_hours=False,
-			key=f"WF-07 nba|{lead.name}|{now_datetime().isoformat()}", context={"action": text})
+		notify("WF-07 AI next best action", [owner], lead=lead.name, 
+			context={"action": text})
 	return {**values, "summary": summary}
-
-
-def _refresh_todo(ref_dt, ref_name, owner, action, due, priority="Medium"):
-	if not owner or owner in ("Administrator", "Guest"):
-		return
-	for name in frappe.get_all("ToDo", filters={"reference_type": ref_dt, "reference_name": ref_name, "status": "Open",
-			"description": ("like", f"{TODO_TAG}%")}, pluck="name"):
-		frappe.db.set_value("ToDo", name, "status", "Cancelled", update_modified=False)
-	frappe.get_doc({"doctype": "ToDo", "allocated_to": owner, "reference_type": ref_dt, "reference_name": ref_name,
-		"description": f"{TODO_TAG} {action}", "date": due, "priority": priority,
-		"assigned_by": "Administrator"}).insert(ignore_permissions=True)
 
 
 def enqueue_next_action(lead_name):
@@ -237,6 +231,10 @@ def research_website(lead_name: str, language=None) -> dict:
 			parts.append(f"{label}: {val}")
 	brief = "\n".join(p for p in parts if p)
 	frappe.db.set_value("Lead", lead.name, "alphax_ai_company_brief", brief, update_modified=False)
+	from alphax_crm.crm.automation import log_action
+	log_action("WF-07 Company brief saved", lead.name, ("Lead", lead.name), "Company brief saved")
+	from alphax_crm.crm.automation import log_action
+	log_action("WF-07 Lead brief saved", lead.name, ("Lead", lead.name), "Lead history, latest interaction and open items refreshed")
 	return {"brief": brief}
 
 
@@ -281,6 +279,9 @@ def draft_followups(lead_name, steps=None, purpose="Follow-up", instruction="", 
 			"subject": subject, "body": body, "generated_by_ai": 1,
 			"send_after": add_to_date(now_datetime(), days=offset, as_datetime=True),
 		}).insert().name)
+	from alphax_crm.crm.automation import log_action
+	for name in created:
+		log_action("WF-07 Follow-up draft saved", lead.name, (DRAFT_DT, name), "Draft awaiting user approval")
 	return created
 
 
@@ -291,6 +292,8 @@ def cancel_pending_sequence(ref_dt, ref_name, reason):
 		"status": ("in", ("Draft", "Approved")), "purpose": ("in", ("Follow-up", "Re-engagement"))}, pluck="name")
 	for name in names:
 		frappe.db.set_value(DRAFT_DT, name, {"status": "Cancelled", "error": reason})
+		from alphax_crm.crm.automation import log_action
+		log_action("WF-07 Follow-up sequence stopped", ref_name if ref_dt == "Lead" else None, (DRAFT_DT, name), reason)
 	return len(names)
 
 
@@ -308,9 +311,13 @@ def on_communication(doc, method=None):
 
 
 def send_draft(name):
+	row = frappe.db.sql("select status from `tabAlphaX Email Draft` where name=%s for update", (name,))
+	if row and row[0][0] == "Sent":
+		return
 	draft = frappe.get_doc(DRAFT_DT, name)
-	if draft.status != "Approved":
+	if draft.status != "Approved" or not draft.approved_by:
 		frappe.throw(_("Only approved drafts can be sent."))
+	frappe.db.savepoint("ax_send_approved_draft")
 	try:
 		from frappe.core.doctype.communication.email import make
 
@@ -318,8 +325,19 @@ def send_draft(name):
 			subject=draft.subject, recipients=draft.recipient, cc=draft.cc or None,
 			communication_medium="Email", sent_or_received="Sent", send_email=True)
 		comm = result.get("name") if isinstance(result, dict) else None
+		from alphax_crm.crm import automation as auto
+		lead = draft.reference_name if draft.reference_doctype == "Lead" else None
+		if draft.reference_doctype == "Quotation":
+			lead = auto.lead_for_quotation(draft.reference_name)
+			if lead:
+				auto.system_comment("Lead", lead, f"AlphaX: approved email {draft.subject} queued for {draft.reference_name} ({comm or name})")
+		auto.log_action("WF-07 Approved email queued", lead, (draft.reference_doctype, draft.reference_name),
+			f"Draft {name} approved by {draft.approved_by}, queued for {draft.recipient}")
 		draft.db_set({"status": "Sent", "sent_on": now_datetime(), "communication": comm, "error": None})
 	except Exception as e:
+		frappe.db.rollback(save_point="ax_send_approved_draft")
+		from alphax_crm.crm.action_history import record, lead_for_reference
+		record("Approved draft send failed", DRAFT_DT, name, lead_for_reference(draft.reference_doctype, draft.reference_name), True, str(e))
 		draft.db_set({"status": "Failed", "error": str(e)[:500]})
 		frappe.log_error(title=f"AlphaX AI: email draft {name} failed", message=frappe.get_traceback())
 
@@ -347,42 +365,20 @@ def expiring_quotations(days=None, limit=200):
 
 
 def daily_quotation_watch():
-	settings = get_settings()
-	if not cint(settings.get("ai_quotation_watch")):
-		return
-	for q in expiring_quotations():
-		days_left = date_diff(q.valid_till, nowdate())
-		if not frappe.db.exists("ToDo", {"reference_type": "Quotation", "reference_name": q.name, "status": "Open",
-				"description": ("like", f"{TODO_TAG}%")}):
-			frappe.get_doc({"doctype": "ToDo", "allocated_to": q.owner, "reference_type": "Quotation",
-				"reference_name": q.name, "date": q.valid_till, "priority": "High" if days_left <= 1 else "Medium",
-				"assigned_by": "Administrator",
-				"description": f"{TODO_TAG} " + _("Quotation {0} for {1} expires on {2} ({3} day(s) left). "
-					"Confirm the decision or extend validity.").format(q.name, q.customer_name or q.party_name,
-					q.valid_till, days_left)}).insert(ignore_permissions=True)
-		if cint(settings.get("ai_draft_quotation_reminders")) and is_enabled() and q.contact_email:
-			if frappe.db.exists(DRAFT_DT, {"reference_doctype": "Quotation", "reference_name": q.name,
-					"purpose": "Quotation Reminder"}):
-				continue
-			try:
-				draft_quotation_reminder(q.name)
-				frappe.db.commit()
-			except AIError as e:
-				frappe.logger("alphax_crm").info(f"quotation reminder for {q.name} skipped: {e}")
-			except Exception:
-				frappe.db.rollback()
-				frappe.log_error(title=f"AlphaX AI: quotation reminder failed for {q.name}", message=frappe.get_traceback())
+	from alphax_crm.crm.workflow import wf04_daily
+	wf04_daily()
 
 
 def draft_quotation_reminder(quotation, language=None) -> str:
 	settings = get_settings()
 	doc = frappe.get_doc("Quotation", quotation)
-	if not doc.contact_email:
+	from alphax_crm.crm.automation import lead_for_quotation
+	lead = lead_for_quotation(doc)
+	recipient = doc.contact_email or (lead and frappe.db.get_value("Lead", lead, "email_id"))
+	if not recipient:
 		frappe.throw(_("Quotation {0} has no contact email.").format(doc.name))
 	if not language:
-		from alphax_crm.crm.automation import lead_for_quotation
-
-		language = lead_language(lead_for_quotation(doc))
+		language = lead_language(lead)
 	items = "\n".join(f"- {i.item_name} x {i.get_formatted('qty')}" for i in doc.items[:8])
 	user = (f"Quotation {doc.name} for {doc.customer_name or doc.party_name}\nTotal: {doc.get_formatted('grand_total')}\n"
 		f"Valid till: {doc.get_formatted('valid_till')} ({date_diff(doc.valid_till, nowdate()) if doc.valid_till else '?'} days left)\n"
@@ -395,10 +391,13 @@ def draft_quotation_reminder(quotation, language=None) -> str:
 	body = str(result.get("body_html") or "").strip()
 	if settings.get("ai_email_signature"):
 		body += f"<br>{settings.ai_email_signature}"
-	return frappe.get_doc({"doctype": DRAFT_DT, "purpose": "Quotation Reminder", "sequence_no": 1, "language": language,
-		"reference_doctype": "Quotation", "reference_name": doc.name, "recipient": doc.contact_email,
+	draft = frappe.get_doc({"doctype": DRAFT_DT, "purpose": "Quotation Reminder", "sequence_no": 1, "language": language,
+		"reference_doctype": "Quotation", "reference_name": doc.name, "recipient": recipient,
 		"subject": str(result.get("subject") or _("Your quotation {0}").format(doc.name))[:140], "body": body,
 		"generated_by_ai": 1}).insert(ignore_permissions=True).name
+	from alphax_crm.crm.automation import log_action
+	log_action("WF-07 Quotation draft saved", lead, ("Quotation", doc.name), f"Draft {draft} awaiting user approval")
+	return draft
 
 
 # ============================================================================== desk API
@@ -480,6 +479,8 @@ def lead_brief(lead_name, language=None) -> dict:
 	if items:
 		brief += "\n" + _("Open items") + ":\n" + "\n".join(f"• {i}" for i in items)
 	frappe.db.set_value("Lead", lead.name, {"alphax_ai_brief": brief, "alphax_ai_last_run": now_datetime()}, update_modified=False)
+	from alphax_crm.crm.automation import log_action
+	log_action("WF-07 Lead brief saved", lead.name, ("Lead", lead.name), "Lead history, latest interaction and open items refreshed")
 	return {"brief": brief}
 
 
@@ -509,7 +510,7 @@ INTENT_LABELS = {"interested": "Interested", "revision": "Asks for a revision", 
 
 def on_inbound_email(doc, method=None):
 	"""Inbound client email on a Lead (or on a Quotation linked to one): detect intent in the background."""
-	if doc.get("sent_or_received") != "Received" or doc.get("communication_type") != "Communication":
+	if doc.get("sent_or_received") != "Received" or doc.get("communication_type") != "Communication" or doc.get("communication_medium") != "Email":
 		return
 	settings = get_settings()
 	if not (cint(settings.ai_enabled) and cint(settings.get("ai_intent_detection", 1))):
@@ -557,29 +558,46 @@ def detect_intent(communication, lead):
 		if depth.get((current or "").lower(), 0) >= depth.get("interested", 1):
 			suggested = None  # already past Interested: nothing to suggest
 	label = f"{INTENT_LABELS[intent]} ({conf}%) — {pure.truncate(str(r.get('summary') or ''), 200)}"
-	frappe.db.set_value("Lead", lead, {"alphax_ai_intent": label, "alphax_ai_suggested_stage": suggested or ""},
+	frappe.db.set_value("Lead", lead, {"alphax_ai_intent": label, "alphax_ai_suggested_stage": suggested or "", "alphax_intent_email": communication},
 		update_modified=False)
 	auto.system_comment("Lead", lead, f"AlphaX AI: inbound email intent = {label}"
 		+ (f'; suggested stage "{suggested}" (needs your confirmation)' if suggested else ""))
 	owner = frappe.db.get_value("Lead", lead, "lead_owner") or frappe.db.get_value("Lead", lead, "owner")
-	auto.notify("WF-07 AI intent detected", [owner], lead=lead, email=False, respect_hours=False,
-		key=f"WF-07 intent|{communication}",
+	auto.notify("WF-07 AI intent detected", [owner], lead=lead, 
+		reference=("Communication", communication), trigger_date=comm.creation,
 		context={"intent": INTENT_LABELS[intent], "detail": label, "suggested_stage": suggested or ""})
 	frappe.db.commit()
 	return {"intent": intent, "confidence": conf, "suggested_stage": suggested}
 
 
 @frappe.whitelist(methods=["POST"])
-def apply_suggested_stage(lead, next_contact_date=None):
+def apply_suggested_stage(lead, next_contact_date=None, expected_source=None, expected_stage=None):
 	"""The user confirms the AI's suggested stage. All workflow rules (WF-01/05/06) still apply."""
 	_check("Lead", lead)
 	doc = frappe.get_doc("Lead", lead)
 	stage = doc.get("alphax_ai_suggested_stage")
+	if expected_source and (expected_source != doc.alphax_intent_email or expected_stage != stage):
+		frappe.throw(_("The suggestion changed. Reload the Lead before applying it."))
 	if not stage:
 		frappe.throw(_("There is no suggested stage on this Lead."))
 	doc.status = stage
 	if next_contact_date:
 		doc.alphax_next_contact_date = next_contact_date
+		doc.alphax_confirmed_postpone_date = next_contact_date
 	doc.alphax_ai_suggested_stage = None
 	doc.save()
+	from alphax_crm.crm.action_history import record
+	record("Applied AI suggestion", "Lead", lead, lead, detail=stage)
 	return doc.status
+
+
+@frappe.whitelist(methods=["POST"])
+def dismiss_intent(lead, expected_source, expected_stage):
+    _check("Lead", lead)
+    doc = frappe.get_doc("Lead", lead)
+    if (doc.alphax_intent_email or "") != (expected_source or "") or doc.alphax_ai_suggested_stage != expected_stage:
+        frappe.throw(_("The suggestion changed. Reload the Lead."))
+    doc.alphax_ai_suggested_stage = None
+    doc.save()
+    from alphax_crm.crm.action_history import record
+    record("Dismissed AI suggestion", "Lead", lead, lead, detail=expected_stage)

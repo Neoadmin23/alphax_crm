@@ -6,6 +6,14 @@ from frappe.utils import get_datetime, now_datetime, validate_email_address
 
 class AlphaXEmailDraft(Document):
 	def validate(self):
+		before = self.get_doc_before_save()
+		if self.status == "Approved":
+			if not before or before.status != "Approved":
+				if not self.flags.get("alphax_explicit_approval"):
+					frappe.throw(_("Use Approve after reviewing this email."))
+			elif any(before.get(f) != self.get(f) for f in ("recipient", "cc", "subject", "body", "reference_doctype", "reference_name")):
+				self.status = "Draft"
+				self.approved_by = None
 		self.recipient = (self.recipient or "").strip()
 		validate_email_address(self.recipient, throw=True)
 		if self.cc:
@@ -20,6 +28,7 @@ class AlphaXEmailDraft(Document):
 		self._require_write()
 		if self.status not in ("Draft", "Failed"):
 			frappe.throw(_("Only drafts can be approved."))
+		self.flags.alphax_explicit_approval = True
 		self.status = "Approved"
 		self.approved_by = frappe.session.user
 		self.error = None

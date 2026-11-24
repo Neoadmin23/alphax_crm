@@ -33,25 +33,11 @@ SPEC_FLOW = ["Lead", "Interested", "Qualified lead", "Quotation", "Postponed", "
 # ============================================================================ stages
 def stage_map(settings=None):
 	"""[(stage, status)] from AlphaX CRM Settings > Lead Stage Map (rows: Lead Status, Lead Stage)."""
-	settings = settings or get_settings()
-	return [((r.lead_stage or "").strip(), (r.lead_status or "").strip()) for r in settings.get("lead_stage_map") or []
-		if r.lead_stage and r.lead_status]
+	return list(SPEC_STAGE_MAP)
 
 
-def approved_stages(settings=None) -> list[str]:
-	settings = settings or get_settings()
-	seen, out = set(), []
-	for stage, _status in stage_map(settings):
-		if stage.lower() not in seen:
-			seen.add(stage.lower())
-			out.append(stage)
-	for t in settings.get("stage_transitions") or []:
-		for s in (t.from_stage, t.to_stage):
-			s = (s or "").strip()
-			if s and s.lower() not in seen:
-				seen.add(s.lower())
-				out.append(s)
-	return out
+def approved_stages(settings=None):
+	return list(SPEC_FLOW)
 
 
 def initial_stage(settings=None) -> str:
@@ -111,6 +97,8 @@ def lead_validate(doc, settings):
 	sync_stage_and_status(doc, settings)
 	enforce_approved_stage(doc, settings)
 	enforce_postponed_date(doc, settings)
+	if doc.get(STAGE) == "Contract Under Signing" and doc.get("custom_contract"):
+		frappe.throw(_("Clear Contract while the contract is under signing. Set it to Signed when marking the Lead Won."))
 
 
 def protect_stage_from_core(doc, settings):
@@ -122,9 +110,7 @@ def protect_stage_from_core(doc, settings):
 		return
 	# approved stage chosen by the user, or a legacy value (Open, Replied...) already stored on an old
 	# Lead: either way core's side-effect must not change it (otherwise old Leads become unsavable)
-	stored = None if doc.is_new() else frappe.db.get_value("Lead", doc.name, STAGE)
-	if _is_approved(intended, settings) or intended == stored:
-		doc.set(STAGE, intended)
+	doc.set(STAGE, intended)
 
 
 def sync_stage_and_status(doc, settings):
@@ -137,14 +123,19 @@ def sync_stage_and_status(doc, settings):
 	else:
 		old_stage, old_status = frappe.db.get_value("Lead", doc.name, [STAGE, STATUS]) or (None, None)
 	stage, status = doc.get(STAGE), doc.get(STATUS)
+	if stage:
+		stage = next((s for s in SPEC_FLOW if s.lower() == stage.strip().lower()), stage)
+		doc.set(STAGE, stage)
 	if stage != old_stage or doc.is_new():
 		target = status_for_stage(stage, settings)
 		if target and target != status:
 			ensure_select_option("Lead", STATUS, target)
 			doc.set(STATUS, target)
-	elif status and status != old_status:
+	elif status != old_status:
 		target = stage_for_status(status, stage, settings)
-		if target and target != stage:
+		if not target:
+			frappe.throw(_("Select a Lead Status from the approved mapping."))
+		if target != stage:
 			ensure_select_option("Lead", STAGE, target)
 			doc.set(STAGE, target)
 			doc.flags.alphax_stage_auto_set = True
@@ -160,7 +151,7 @@ def enforce_approved_stage(doc, settings):
 	stage = (doc.get(STAGE) or "").strip()
 	first = initial_stage(settings)
 	if doc.is_new():
-		if stage.lower() != first.lower() and not _bypass(settings):
+		if stage.lower() != first.lower():
 			doc.set(STAGE, first)
 			if doc.meta.has_field(STATUS):
 				doc.set(STATUS, status_for_stage(first, settings) or doc.get(STATUS))
@@ -171,11 +162,6 @@ def enforce_approved_stage(doc, settings):
 			return  # legacy value already stored: allow other edits; health check reports it
 		frappe.throw(_('"{0}" is not a stage in the approved Lead workflow. Use one of: {1}').format(
 			stage, ", ".join(stages)), title=_("Stage Not Allowed"))
-
-
-def _bypass(settings):
-	roles = {r.strip() for r in (settings.get("stage_flow_bypass_roles") or "").split(",") if r.strip()}
-	return bool(roles & set(frappe.get_roles()))
 
 
 def enforce_postponed_date(doc, settings):
@@ -192,6 +178,10 @@ def enforce_postponed_date(doc, settings):
 	# Entering Postponed: the date must be chosen in the same save. The date AlphaX seeds when a
 	# Lead is created ("first follow-up") must not count as the agreed revisit date.
 	chosen = date and (not entering or str(getdate(date)) != str(getdate(old_date) if old_date else ""))
+	if date and doc.get("alphax_confirmed_postpone_date") and getdate(doc.alphax_confirmed_postpone_date) == getdate(date):
+		chosen = True
+	if doc.meta.has_field("alphax_confirmed_postpone_date"):
+		doc.alphax_confirmed_postpone_date = None
 	if not date or not chosen or (entering and getdate(date) < getdate(nowdate())):
 		frappe.throw(_("Choose the Next Contact Date (today or later) when postponing this Lead."),
 			title=_("Next Contact Date Required"))
@@ -201,6 +191,17 @@ def lead_on_update(doc, before, settings):
 	"""Log every stage/status change (SLA timers start here) and start WF-02 when entering Quotation."""
 	if not before:
 		return
+	if doc.get("alphax_review_status") != before.get("alphax_review_status"):
+		state = doc.get("alphax_review_status")
+		if state in ("Pending Review", "Returned for Correction", "Approved"):
+			if state == "Pending Review":
+				from alphax_crm.setup.install import REVIEWER_ROLE
+				people = auto.approvers(frappe._dict(approver_role=REVIEWER_ROLE))
+			else:
+				people = [doc.get("lead_owner") or doc.owner]
+			auto.notify("Lead review " + state, people, lead=doc.name,
+				subject=_("Lead {0}: {1}").format(doc.name, state),
+				message=escape_html(doc.get("alphax_review_notes") or state))
 	if before.get(STAGE) != doc.get(STAGE):
 		_transition(doc.name, "Lead Stage", before.get(STAGE), doc.get(STAGE))
 		if doc.meta.has_field("alphax_proposed_action") and doc.get("alphax_proposed_action"):
@@ -311,35 +312,24 @@ def quotation_after_insert(doc, method=None):
 	settings = get_settings()
 	if not cint(settings.get("notify_approvers_on_quotation_create", 1)):
 		return
-	try:
-		lead = auto.lead_for_quotation(doc)
-		auto.notify("WF-02 Quotation created", auto.approvers(settings), lead=lead, reference=("Quotation", doc.name),
-			trigger_date=nowdate(), key=f"WF-02 created|{doc.name}",
-			context={**emails.quotation_context(doc, lead), "created_by": frappe.utils.get_fullname(doc.owner)})
-	except Exception:
-		log_error(f"WF-02 created {doc.name}")
-
+	lead = auto.lead_for_quotation(doc)
+	auto.notify("WF-02 Quotation created", auto.approvers(settings), lead=lead, reference=("Quotation", doc.name),
+		trigger_date=nowdate(), key=f"WF-02 created|{doc.name}",
+		context={**emails.quotation_context(doc, lead), "created_by": frappe.utils.get_fullname(doc.owner)})
 
 def quotation_on_submit(doc, method=None):
 	settings = get_settings()
 	lead = auto.lead_for_quotation(doc)
 	if lead:
-		try:
-			_wf03_move_lead(doc, lead, settings)
-		except Exception:
-			log_error(f"WF-03 move {doc.name}")
-	try:
-		if cint(settings.get("wf03_confirmation_enabled", 1)):
-			people = [doc.owner] + ([frappe.db.get_value("Lead", lead, "lead_owner")] if lead else [])
-			auto.notify("WF-03 Quotation confirmation", people, lead=lead, reference=("Quotation", doc.name),
-				trigger_date=nowdate(), key=f"WF-03 confirm|{doc.name}", context=emails.quotation_context(doc, lead))
-		if cint(settings.get("notify_approvers_on_quotation", 1)):
-			auto.notify("WF-02 Quotation submitted", auto.approvers(settings), lead=lead,
-				reference=("Quotation", doc.name), trigger_date=nowdate(), key=f"WF-02 submitted|{doc.name}",
-				context=emails.quotation_context(doc, lead))
-	except Exception:
-		log_error(f"WF-03 notify {doc.name}")
-
+		_wf03_move_lead(doc, lead, settings)
+	if cint(settings.get("wf03_confirmation_enabled", 1)):
+		people = [doc.owner] + ([frappe.db.get_value("Lead", lead, "lead_owner")] if lead else [])
+		auto.notify("WF-03 Quotation confirmation", people, lead=lead, reference=("Quotation", doc.name),
+			trigger_date=nowdate(), key=f"WF-03 confirm|{doc.name}", context=emails.quotation_context(doc, lead))
+	if cint(settings.get("notify_approvers_on_quotation", 1)):
+		auto.notify("WF-02 Quotation submitted", auto.approvers(settings), lead=lead,
+			reference=("Quotation", doc.name), trigger_date=nowdate(), key=f"WF-02 submitted|{doc.name}",
+			context=emails.quotation_context(doc, lead))
 
 def quotation_before_cancel(doc, method=None):
 	"""Cancel runs no validate: stash the Lead stage here so on_cancel can undo core's change."""
@@ -353,10 +343,9 @@ def quotation_on_cancel(doc, method=None):
 def _wf03_move_lead(doc, lead, settings):
 	"""Lead still at an earlier stage -> move to Quotation (logged); otherwise keep its stage."""
 	before = doc.flags.get("alphax_lead_stage") or frappe.db.get_value("Lead", lead, STAGE)
-	depth = stage_depth(settings)
 	target = "Quotation"
 	b = (before or "").strip().lower()
-	earlier = b not in depth or depth.get(b, 99) < depth.get(target.lower(), 3)
+	earlier = b in {"lead", "interested", "qualified lead", "open", "replied", "opportunity"}
 	if earlier and cint(settings.get("wf03_move_lead_to_quotation", 1)):
 		frappe.db.set_value("Lead", lead, STAGE, before, update_modified=False)  # undo core's silent change first
 		set_stage_system(lead, target, _("Quotation {0} was submitted (WF-03)").format(doc.name), ("Quotation", doc.name),
@@ -369,11 +358,11 @@ def check_lost_quotation(doc, settings):
 	"""WF-06: Lost Quotation needs a linked quotation marked Lost, with a reason."""
 	stage = (doc.get(STAGE) or "").strip().lower()
 	lq = (settings.get("lost_quotation_stage_value") or "Lost Quotation").strip().lower()
-	if stage != lq or doc.is_new():
+	if stage != lq:
 		return True
 	lost = auto.quotations_for_lead(doc.name, {"docstatus": 1, "status": "Lost"}, fields=("name", "order_lost_reason"))
 	for q in lost:
-		if q.order_lost_reason or frappe.db.count("Quotation Lost Reason Detail", {"parent": q.name}):
+		if (q.order_lost_reason or "").strip() or frappe.db.exists("Quotation Lost Reason Detail", {"parent": q.name, "parenttype": "Quotation", "lost_reason": ["is", "set"]}):
 			return True
 	frappe.throw(_("Lost Quotation needs a linked Quotation marked Lost with a reason. Open the quotation and use "
 		"<b>Set as Lost</b> (or the <b>Confirm Lost Quotation</b> button on the Lead)."), title=_("Closure Requirements Not Met"))
@@ -394,9 +383,13 @@ def confirm_lost_quotation(quotation, reason, detailed_reason=None):
 		if stage.lower() in _terminal(settings):
 			frappe.throw(_('Lead {0} is already closed ("{1}"); its quotation cannot move it to Lost Quotation.').format(
 				lead, stage), title=_("Lead Closed"))
+		if stage.lower() not in {"quotation", "postponed", "contract under signing"}:
+			frappe.throw(_("Move the Lead through the approved workflow before closing its quotation."))
 		_stash(q, lead)
+	if q.docstatus != 1 or q.status not in ("Open", "Expired", "Replied") or not (reason or "").strip():
+		frappe.throw(_("Choose an open or expired submitted quotation and supply a loss reason."))
 	if not frappe.db.exists("Quotation Lost Reason", reason):
-		frappe.get_doc({"doctype": "Quotation Lost Reason", "order_lost_reason": reason}).insert(ignore_permissions=True)
+		frappe.throw(_("Select an existing Quotation Lost Reason."))
 	q.flags.alphax_confirmed_by = frappe.utils.get_fullname()
 	q.declare_enquiry_lost([{"lost_reason": reason}], [], detailed_reason or reason)
 	# guard_lead_stage (on_update_after_submit) normally ran quotation_marked_lost already
@@ -414,15 +407,16 @@ def wf02_check_lead(lead, settings=None, on_entry=False):
 		return
 	entry = auto.stage_entry_datetime(lead, "Quotation")
 	people = auto.lead_people(lead)
-	if on_entry:
+	if on_entry or not auto.already_done(f"WF-02 alert|{lead}|{getdate(entry)}"):
 		auto.notify("WF-02 No quotation (alert)", people, lead=lead, trigger_date=entry,
 			key=f"WF-02 alert|{lead}|{getdate(entry)}")
-		return
+		if on_entry:
+			return
 	hours = auto.working_hours_between(entry, now_datetime())
 	if hours >= cint(settings.get("wf02_escalation_hours") or 72):
 		auto.notify("WF-02 No quotation (escalation)", list(set(auto.approvers(settings) + people)), lead=lead,
 			trigger_date=entry, key=f"WF-02 escalation|{lead}|{getdate(entry)}", context={"hours": int(hours)})
-	elif hours >= cint(settings.get("wf02_reminder_hours") or 24):
+	if hours >= cint(settings.get("wf02_reminder_hours") or 24):
 		auto.notify("WF-02 No quotation (reminder)", people, lead=lead, trigger_date=entry,
 			key=f"WF-02 reminder|{lead}|{getdate(entry)}", context={"hours": int(hours)})
 
@@ -431,7 +425,8 @@ def wf02_hourly():
 	settings = get_settings()
 	if not cint(settings.get("wf_quotation_check_enabled", 1)) or not auto.is_business_time():
 		return
-	for lead in frappe.get_all("Lead", filters={STAGE: "Quotation"}, pluck="name", limit=2000):
+	for row in _leads_paged({STAGE: "Quotation"}, ["name"]):
+		lead = row.name
 		try:
 			wf02_check_lead(lead, settings)
 		except Exception:
@@ -450,10 +445,10 @@ def wf04_daily():
 	# "Expired" too: ERPNext's own daily job flips Open -> Expired the day after Valid Till, and the
 	# T0 (weekend expiry) and T+3 steps happen after that. The window ahead covers weekends/holidays
 	# because T-2 counts working days.
-	quotations = frappe.get_all("Quotation", filters={"docstatus": 1, "status": ["in", ["Open", "Replied", "Expired"]],
-		"valid_till": ["between", [add_days(today, -60), add_days(today, before + 14)]]},
+	quotations = _leads_paged(filters={"docstatus": 1, "status": ["in", ["Open", "Replied", "Expired"]],
+		"valid_till": ["<=", add_days(today, before + 60)]},
 		fields=["name", "owner", "creation", "valid_till", "transaction_date", "quotation_to", "party_name", "opportunity",
-			"contact_email", "grand_total", "currency"], limit=2000)
+			"contact_email", "grand_total", "currency"], doctype="Quotation")
 	for q in quotations:
 		try:
 			_wf04_quotation(q, today, before, after, settings)
@@ -465,12 +460,12 @@ def wf04_daily():
 
 def _wf04_quotation(q, today, before, after, settings):
 	lead = auto.lead_for_quotation(q)
-	if lead and auto.is_paused(lead):
+	if lead and (auto.is_paused(lead) or (frappe.db.get_value("Lead", lead, STAGE) or "").lower() in _terminal(settings)):
 		return
 	owner = (frappe.db.get_value("Lead", lead, "lead_owner") if lead else None) or q.owner
 	days_to = date_diff(q.valid_till, today)
 	# follow-up = activity after the quotation was issued; moving the Lead INTO Quotation (WF-03) is not one
-	since = max(get_datetime(q.transaction_date), get_datetime(q.creation))
+	since = _quotation_activity_start(q)
 	activity = auto.activity_since(lead, since, extra_refs=[("Quotation", q.name)], ignore_stage_to=("Quotation",)) \
 		if lead else _quotation_activity(q)
 	vt = formatdate(q.valid_till)
@@ -478,10 +473,12 @@ def _wf04_quotation(q, today, before, after, settings):
 	key = lambda m: f"WF-04 {m}|{name}|{q.valid_till}"
 	ref = ("Quotation", name)
 	if days_to <= -after:
+		if lead and frappe.db.get_value("Lead", lead, STAGE) != "Quotation":
+			return
 		if auto.already_done(key("T+")):
 			return
 		# "if no action has been taken": anything done since the quotation expired cancels the proposal
-		after_expiry = max(get_datetime(q.valid_till), get_datetime(q.creation))
+		after_expiry = get_datetime(q.valid_till)
 		late = auto.activity_since(lead, after_expiry, extra_refs=[("Quotation", q.name)], ignore_stage_to=("Quotation",)) \
 			if lead else _quotation_activity(q, since=after_expiry)
 		if late:
@@ -499,31 +496,48 @@ def _wf04_quotation(q, today, before, after, settings):
 		auto.notify("WF-04 Valid Till reached, no activity", list({owner} | set(auto.approvers(settings))),
 			lead=lead, reference=ref, trigger_date=q.valid_till, key=key("T0"), context=emails.quotation_context(name, lead))
 		return
-	# T-2 in working days: a quotation valid till Sunday gets its reminder on Thursday, not on Friday
-	if auto.working_days_between(today, q.valid_till) <= before and not auto.already_done(key("T-")):
+	notice_date = validity_notice_date(q.valid_till, before, settings)
+	if today >= notice_date and not auto.already_done(key("T-")):
 		if activity:
 			auto.notify("WF-04 Validity notice", [owner], lead=lead, reference=ref, trigger_date=q.valid_till, key=key("T-"),
 				context={**emails.quotation_context(name, lead), "activity": ", ".join(activity)})
 		else:
 			draft = None
-			if cint(settings.get("wf04_ai_draft", 1)) and q.contact_email and cint(settings.get("ai_enabled")):
+			if cint(settings.get("wf04_ai_draft", 1)) and (q.contact_email or (lead and frappe.db.get_value("Lead", lead, "email_id"))) and cint(settings.get("ai_enabled")):
 				try:
 					from alphax_crm.ai.sales import draft_quotation_reminder, lead_language
 
 					draft = draft_quotation_reminder(name, lead_language(lead) if lead else None)
 				except Exception:
 					log_error(f"WF-04 AI draft {name}")
+			if not draft:
+				auto.log_action("WF-04 Draft unavailable", lead, ref,
+					"Review AI settings, provider and contact email. Use Draft Expiry Reminder after correction.")
+
 			auto.notify("WF-04 Expiring, no activity (reminder)", [owner], lead=lead, reference=ref,
 				trigger_date=q.valid_till, key=key("T-"),
 				context={**emails.quotation_context(name, lead), "ai_draft": draft or ""})
 
 
+def validity_notice_date(expiry, days_before, settings):
+	notice = getdate(add_days(expiry, -days_before))
+	cal = auto.calendar(settings)
+	for step in range(60):
+		if auto.is_working_day(notice, cal):
+			break
+		notice = getdate(add_days(notice, -1))
+	return notice
+
+
+def _quotation_activity_start(q):
+	issue = get_datetime(q.transaction_date)
+	created = get_datetime(q.creation)
+	return max(issue, created) if getdate(issue) == getdate(created) else issue
+
+
 def _quotation_activity(q, since=None):
-	found = []
-	if frappe.db.count("Communication", {"reference_doctype": "Quotation", "reference_name": q.name,
-			"communication_type": "Communication", "creation": (">", since or q.transaction_date)}):
-		found.append("email")
-	return found
+	return auto.activity_since(None, since or _quotation_activity_start(q),
+		extra_refs=[("Quotation", q.name)])
 
 
 def lost_quotation_digest():
@@ -531,27 +545,18 @@ def lost_quotation_digest():
 	settings = get_settings()
 	if not cint(settings.get("lost_quotation_digest_enabled", 1)) or not auto.is_working_day(nowdate()):
 		return
-	stage = (settings.get("lost_quotation_stage_value") or "Lost Quotation").strip()
-	leads = frappe.get_all("Lead", filters={STAGE: stage}, fields=["name", "lead_name", "lead_owner", "owner", "modified"],
-		order_by="modified desc", limit=500)
-	if not leads:
-		return
-	since = _previous_working_day()
-	entered = set(frappe.get_all("AlphaX Stage Transition Log", filters={"reference_doctype": "Lead",
-		"field_label": "Lead Stage", "to_value": stage, "changed_on": (">=", since)}, pluck="reference_name"))
-	new = [l for l in leads if l.name in entered]
-	reasons = {}
-	for l in leads:
-		for q in auto.quotations_for_lead(l.name, {"status": "Lost"}, fields=("name", "order_lost_reason", "grand_total")):
-			r = q.order_lost_reason or "-"
-			reasons[r] = reasons.get(r, 0) + 1
-	items = "".join(f'<li><a href="{get_url_to_form("Lead", l.name)}">{l.name}</a> ({escape_html(l.lead_name or "")}), '
-		f"owner {l.lead_owner or l.owner}</li>" for l in new[:30])
-	auto.notify("WF-04 Lost quotation digest", auto.approvers(settings), trigger_date=nowdate(),
-		key=f"WF-04 digest|{nowdate()}", context={
-			"new_count": len(new), "total": len(leads), "new_leads": [dict(l) for l in new[:30]],
-			"new_leads_html": f"<ul>{items}</ul>" if items else "",
-			"top_reasons": ", ".join(f"{k} ({v})" for k, v in sorted(reasons.items(), key=lambda x: -x[1])[:5])})
+	people = auto.approvers(settings)
+	today = nowdate()
+	for q in _leads_paged({"status": "Lost", "docstatus": 1}, ["name", "party_name", "quotation_to",
+			"opportunity", "order_lost_reason"], doctype="Quotation"):
+		lead = auto.lead_for_quotation(q)
+		if lead and auto.is_paused(lead):
+			continue
+		reasons = frappe.get_all("Quotation Lost Reason Detail", filters={"parent": q.name,
+			"parenttype": "Quotation"}, pluck="lost_reason")
+		auto.notify("WF-04 Daily lost quotation", people, lead=lead, reference=("Quotation", q.name),
+			trigger_date=today, context={**emails.quotation_context(q.name, lead),
+				"reason": ", ".join(reasons) or q.order_lost_reason or _("No reason recorded")})
 
 
 # ============================================================================ WF-05 SLA engine (daily 08:00)
@@ -590,11 +595,11 @@ def sla_daily():
 			log_error(f"SLA {fn.__name__}")
 
 
-def _leads_paged(filters, fields, page=500):
+def _leads_paged(filters, fields, page=500, doctype="Lead"):
 	"""All matching Leads, in pages (no silent cap on big pipelines)."""
 	start = 0
 	while True:
-		rows = frappe.get_all("Lead", filters=filters, fields=fields, order_by="name asc", start=start, page_length=page)
+		rows = frappe.get_all(doctype, filters=filters, fields=fields, order_by="name asc", start=start, page_length=page)
 		yield from rows
 		if len(rows) < page:
 			return
@@ -617,6 +622,14 @@ def _sla_lead(lead, stage, stage_rules, today, settings):
 	# later reminder to the same people goes out today (no "first" and "second" reminder on one morning)
 	for rule in sorted(stage_rules, key=lambda r: cint(r.days), reverse=True):
 		start, every = cint(rule.days), cint(rule.get("repeat_every_days"))
+		if stage.lower() == "lead" and start == 7:
+			first_rule = next((r for r in stage_rules if cint(r.days) == 3), None)
+			if first_rule:
+				first_key = f"WF-05 {first_rule.label or stage}#{first_rule.days}.0|{lead.name}|{getdate(entry)}"
+				sent = frappe.db.get_value(auto.LOG_DT, {"dedupe_key": first_key,
+					"status": ["in", ["Sent", "Partly Sent"]]}, "sent_on")
+				if not sent or date_diff(today, getdate(sent)) < 4:
+					continue
 		if days < start:
 			continue
 		occurrence = (days - start) // every if every else 0
@@ -626,7 +639,15 @@ def _sla_lead(lead, stage, stage_rules, today, settings):
 			continue
 		window_start = add_days(getdate(entry), milestone - every) if every and occurrence else entry
 		activity = auto.activity_since(lead.name, get_datetime(window_start))
-		if cint(rule.require_no_activity) and activity:
+		if stage.lower() == "interested":
+			activity = "meeting" in activity
+		elif stage.lower() == "qualified lead":
+			activity = auto.quotations_for_lead(lead.name, {"docstatus": ["<", 2]})
+		elif stage.lower() == "lead":
+			contact = frappe.db.exists("Communication", {"reference_doctype": "Lead",
+				"reference_name": lead.name, "communication_type": "Communication", "creation": [">=", entry]})
+			activity = contact or {"follow-up", "meeting"}.intersection(activity)
+		if cint(rule.require_no_activity) and activity and not (stage.lower() == "contract under signing" and start == 10):
 			continue
 		audience = covers.get(rule.notify, set())
 		if audience and audience <= reached:
@@ -660,10 +681,10 @@ def postponed_daily(settings):
 		if today < due:
 			continue
 		owner = lead.lead_owner or lead.owner
-		activity = auto.activity_since(lead.name, due)
+		activity = auto.activity_since(lead.name, entry)
 		auto.notify("WF-05 Postponed follow-up", [owner], lead=lead.name, trigger_date=due,
 			key=f"WF-05 postponed|{lead.name}|{due}", context={"due": formatdate(due)})
-		if date_diff(today, due) >= 1 and not activity:
+		if date_diff(today, due) >= 1 and "comment" not in activity:
 			auto.notify("WF-05 Postponed overdue (approvers)", list({owner} | set(auto.approvers(settings))),
 				lead=lead.name, trigger_date=due, key=f"WF-05 postponed-overdue|{lead.name}|{due}",
 				context={"due": formatdate(due)})
@@ -722,12 +743,31 @@ def followup_due_daily():
 	start = _previous_working_day()
 	terminal = _terminal(settings) | {(settings.get("postponed_stage_value") or "Postponed").lower()}
 	for lead in frappe.get_all("Lead", filters={"alphax_next_contact_date": ["between", [add_days(start, 1), nowdate()]]},
-			fields=["name", "lead_name", "lead_owner", "owner", "status", "alphax_next_contact_date"], limit=5000):
-		if (lead.status or "").lower() in terminal or auto.is_paused(lead.name):
+			fields=["name", "lead_name", "lead_owner", "owner", "status", "alphax_next_contact_date"]):
+		stage = (lead.status or "").lower()
+		if stage in terminal or auto.is_paused(lead.name):
 			continue
-		auto.notify("Follow-up due", [lead.lead_owner or lead.owner], lead=lead.name,
+		explicit = _logged_followup(lead.name, lead.alphax_next_contact_date)
+		if stage == "lead" and not explicit:
+			continue  # the date AlphaX seeds on a new Lead is covered by the New-lead alert and the WF-05 Lead reminders
+		recipients = [lead.lead_owner or lead.owner] + ([explicit.agent] if explicit and explicit.agent else [])
+		auto.notify("Follow-up due", recipients, lead=lead.name,
 			trigger_date=lead.alphax_next_contact_date, key=f"Follow-up due|{lead.name}|{lead.alphax_next_contact_date}",
-			context={"due": formatdate(lead.alphax_next_contact_date)})
+			context={"due": formatdate(lead.alphax_next_contact_date),
+				"next_action": (explicit.next_action if explicit else "") or ""})
+
+
+def _logged_followup(lead_name, due):
+	"""The follow-up an agent logged that set this Next Contact Date: the latest real (not AlphaX
+	placeholder) AlphaX Follow-up for the Lead, if its Next Follow-up Date is `due`. Else None."""
+	rows = frappe.get_all("AlphaX Follow-up", filters={"reference_doctype": "Lead", "reference_name": lead_name},
+		fields=["name", "agent", "next_action", "next_follow_up_date", "summary"],
+		order_by="follow_up_datetime desc, creation desc", limit=10)
+	for r in rows:
+		if (r.summary or "").startswith("AlphaX:"):
+			continue
+		return r if r.next_follow_up_date and getdate(r.next_follow_up_date) == getdate(due) else None
+	return None
 
 
 DAILY_JOBS = ("sla_daily", "wf04_daily", "lost_quotation_digest", "followup_due_daily")
@@ -767,8 +807,14 @@ def quotation_marked_lost(doc):
 		if q.name != doc.name]
 	# "Set as Lost" saves as update-after-submit (no validate) and core rewrote the Lead before that
 	# save, so the stage before core touched it comes from AlphaX's own transition log.
-	before = doc.flags.get("alphax_lead_stage") or auto.last_logged_stage(lead)
-	if others:
+	before = doc.flags.get("alphax_lead_stage") or (frappe.db.get_value("Lead", lead, STAGE) if doc.get("quotation_to") != "Lead" else None) or auto.last_logged_stage(lead)
+	if not before:
+		before = frappe.db.get_value("Lead", lead, STAGE)
+	if before and before.lower() in _terminal(settings):
+		if frappe.db.get_value("Lead", lead, STAGE) != before:
+			frappe.db.set_value("Lead", lead, STAGE, before)
+		return
+	if others or (before or "").lower() not in {"quotation", "postponed", "contract under signing"}:
 		if before and frappe.db.get_value("Lead", lead, STAGE) != before and _is_approved(before, settings):
 			frappe.db.set_value("Lead", lead, STAGE, before, update_modified=False)
 			st = status_for_stage(before, settings)
@@ -778,6 +824,9 @@ def quotation_marked_lost(doc):
 		auto.log_action("WF-06 Quotation marked Lost", lead, ("Quotation", doc.name), f"Lead kept at {before}: {', '.join(others)} still open")
 		return
 	target = (settings.get("lost_quotation_stage_value") or "Lost Quotation").strip()
+	if doc.docstatus != 1 or doc.status != "Lost" or not ((doc.get("order_lost_reason") or "").strip() or any(r.get("lost_reason") for r in doc.get("lost_reasons") or [])
+			or frappe.db.exists("Quotation Lost Reason Detail", {"parent": doc.name, "parenttype": "Quotation", "lost_reason": ["is", "set"]})):
+		frappe.throw(_("A submitted Lost quotation with a reason is required."))
 	who = doc.flags.get("alphax_confirmed_by")
 	reason = _("{0} confirmed Lost Quotation for {1}").format(who, doc.name) if who else _("Quotation {0} was marked Lost").format(doc.name)
 	set_stage_system(lead, target, reason, ("Quotation", doc.name),
@@ -796,6 +845,7 @@ def boot_session(bootinfo):
 			"postponed": (settings.get("postponed_stage_value") or "Postponed").strip(),
 			"lost_quotation": (settings.get("lost_quotation_stage_value") or "Lost Quotation").strip(),
 			"require_next_contact": cint(settings.get("postponed_require_next_contact", 1)),
+			"postponed_highlight": settings.get("postponed_highlight") or "Both",
 		}
 	except Exception:
 		pass
@@ -806,5 +856,6 @@ def lead_quotations(lead):
 	"""Submitted quotations linked to the Lead (any of the three link paths) for the Confirm Lost dialog."""
 	if not frappe.has_permission("Lead", "read", lead):
 		frappe.throw(_("Not permitted"), frappe.PermissionError)
-	return auto.quotations_for_lead(lead, {"docstatus": 1, "status": ["in", ["Open", "Replied", "Expired"]]},
+	rows = auto.quotations_for_lead(lead, {"docstatus": 1, "status": ["in", ["Open", "Replied", "Expired"]]},
 		fields=("name", "valid_till", "grand_total", "currency", "status"))
+	return [q for q in rows if frappe.has_permission("Quotation", "read", q.name)]

@@ -1,154 +1,154 @@
 {
- "charts": [],
- "content": "[{\"id\":\"alphax_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">AlphaX CRM Automation</span>\",\"col\":12}},{\"id\":\"alphax_sc\",\"type\":\"card\",\"data\":{\"card_name\":\"CRM\",\"col\":4}},{\"id\":\"alphax_settings_card\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}},{\"id\":\"cMlpi_KKAy\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"bqkNudsjvv\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Lead Workflow</b></span>\",\"col\":6}},{\"id\":\"L8OjBo0Mlw\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Lead Tracking</b></span>\",\"col\":6}},{\"id\":\"WsqE7RczzF\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Draft Leads\",\"col\":3}},{\"id\":\"2ZcrVeaNo2\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"f8t_J_DdrU\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Follow-ups Due\",\"col\":3}},{\"id\":\"12BSqQzy95\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"rsRr-MBTpJ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Pending Approvals\",\"col\":3}},{\"id\":\"sTA1S7FqaZ\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"6qsbsp5hIq\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Follow-ups Due Report\",\"col\":3}},{\"id\":\"i9fBRyV0V9\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"3VyskJ0I48\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Approved Leads\",\"col\":3}},{\"id\":\"jmde0DK2OT\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"eWv57ONhLn\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Lead Data Quality Monitor\",\"col\":3}},{\"id\":\"wD9nB8D9cL\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"tZrAkhv4JD\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Returned for Correction\",\"col\":3}},{\"id\":\"JpCySM3v55\",\"type\":\"spacer\",\"data\":{\"col\":9}}]",
- "creation": "2026-10-28 15:38:49.443584",
- "custom_blocks": [],
- "docstatus": 0,
- "doctype": "Workspace",
- "for_user": "",
- "hide_custom": 0,
- "icon": "rocket",
- "idx": 0,
- "is_hidden": 0,
- "label": "AlphaX CRM",
- "links": [
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Configuration",
-   "link_count": 2,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "AlphaX CRM Settings",
-   "link_count": 0,
-   "link_to": "AlphaX CRM Settings",
-   "link_type": "DocType",
-   "onboard": 1,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Score Rules",
-   "link_count": 0,
-   "link_to": "AlphaX Lead Score Rule",
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "CRM",
-   "link_count": 3,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "PreLead",
-   "link_count": 0,
-   "link_to": "AlphaX PreLead",
-   "link_type": "DocType",
-   "onboard": 1,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Lead",
-   "link_count": 0,
-   "link_to": "Lead",
-   "link_type": "DocType",
-   "onboard": 1,
-   "type": "Link"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
-   "label": "Opportunity",
-   "link_count": 0,
-   "link_to": "Opportunity",
-   "link_type": "DocType",
-   "onboard": 1,
-   "type": "Link"
-  }
- ],
- "modified": "2026-11-02 12:42:05.989995",
- "modified_by": "Administrator",
- "module": "AlphaX CRM",
- "name": "AlphaX CRM",
- "number_cards": [],
- "owner": "Administrator",
- "parent_page": "",
- "public": 1,
- "quick_lists": [],
- "roles": [],
- "sequence_id": 100.0,
- "shortcuts": [
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Draft Leads",
-   "link_to": "Lead",
-   "stats_filter": "[[\"Lead\",\"workflow_state\",\"=\",\"Draft\",false]]",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Follow-ups Due",
-   "link_to": "AlphaX Follow-up",
-   "stats_filter": "[[\"AlphaX Follow-up\",\"name\",\"=\",null,false]]",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Lead Data Quality Monitor",
-   "link_to": "Lead Data Quality Monitor",
-   "report_ref_doctype": "Lead",
-   "type": "Report"
-  },
-  {
-   "color": "Red",
-   "doc_view": "List",
-   "label": "Returned for Correction",
-   "link_to": "Lead",
-   "stats_filter": "[[\"Lead\",\"workflow_state\",\"=\",\"Returned for Correction\",false]]",
-   "type": "DocType"
-  },
-  {
-   "color": "Grey",
-   "doc_view": "List",
-   "label": "Follow-ups Due Report",
-   "link_to": "AlphaX Follow-ups Due",
-   "report_ref_doctype": "AlphaX Follow-up",
-   "type": "Report"
-  },
-  {
-   "color": "Orange",
-   "doc_view": "List",
-   "label": "Pending Approvals",
-   "link_to": "Lead",
-   "stats_filter": "[[\"Lead\",\"workflow_state\",\"=\",\"Pending Approval\",false]]",
-   "type": "DocType"
-  },
-  {
-   "color": "Green",
-   "doc_view": "List",
-   "label": "Approved Leads",
-   "link_to": "Lead",
-   "stats_filter": "[[\"Lead\",\"workflow_state\",\"=\",\"Approved\",false]]",
-   "type": "DocType"
-  }
- ],
- "title": "AlphaX CRM"
+  "charts": [],
+  "content": "[{\"id\":\"alphax_header\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\">AlphaX CRM Automation</span>\",\"col\":12}},{\"id\":\"alphax_sc\",\"type\":\"card\",\"data\":{\"card_name\":\"CRM\",\"col\":4}},{\"id\":\"alphax_settings_card\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}},{\"id\":\"cMlpi_KKAy\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"bqkNudsjvv\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Lead Workflow</b></span>\",\"col\":6}},{\"id\":\"L8OjBo0Mlw\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Lead Tracking</b></span>\",\"col\":6}},{\"id\":\"WsqE7RczzF\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Draft Leads\",\"col\":3}},{\"id\":\"2ZcrVeaNo2\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"f8t_J_DdrU\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Follow-ups Due\",\"col\":3}},{\"id\":\"12BSqQzy95\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"rsRr-MBTpJ\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Pending Approvals\",\"col\":3}},{\"id\":\"sTA1S7FqaZ\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"6qsbsp5hIq\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Follow-ups Due Report\",\"col\":3}},{\"id\":\"i9fBRyV0V9\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"3VyskJ0I48\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Approved Leads\",\"col\":3}},{\"id\":\"jmde0DK2OT\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"eWv57ONhLn\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Lead Data Quality Monitor\",\"col\":3}},{\"id\":\"wD9nB8D9cL\",\"type\":\"spacer\",\"data\":{\"col\":3}},{\"id\":\"tZrAkhv4JD\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Returned for Correction\",\"col\":3}},{\"id\":\"JpCySM3v55\",\"type\":\"spacer\",\"data\":{\"col\":9}}]",
+  "creation": "2026-10-28 15:38:49.443584",
+  "custom_blocks": [],
+  "docstatus": 0,
+  "doctype": "Workspace",
+  "for_user": "",
+  "hide_custom": 0,
+  "icon": "rocket",
+  "idx": 0,
+  "is_hidden": 0,
+  "label": "AlphaX CRM",
+  "links": [
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Configuration",
+      "link_count": 2,
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Card Break"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "AlphaX CRM Settings",
+      "link_count": 0,
+      "link_to": "AlphaX CRM Settings",
+      "link_type": "DocType",
+      "onboard": 1,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Score Rules",
+      "link_count": 0,
+      "link_to": "AlphaX Lead Score Rule",
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "CRM",
+      "link_count": 3,
+      "link_type": "DocType",
+      "onboard": 0,
+      "type": "Card Break"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "PreLead",
+      "link_count": 0,
+      "link_to": "AlphaX PreLead",
+      "link_type": "DocType",
+      "onboard": 1,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Lead",
+      "link_count": 0,
+      "link_to": "Lead",
+      "link_type": "DocType",
+      "onboard": 1,
+      "type": "Link"
+    },
+    {
+      "hidden": 0,
+      "is_query_report": 0,
+      "label": "Opportunity",
+      "link_count": 0,
+      "link_to": "Opportunity",
+      "link_type": "DocType",
+      "onboard": 1,
+      "type": "Link"
+    }
+  ],
+  "modified": "2026-11-02 12:42:05.989995",
+  "modified_by": "Administrator",
+  "module": "AlphaX CRM",
+  "name": "AlphaX CRM",
+  "number_cards": [],
+  "owner": "Administrator",
+  "parent_page": "",
+  "public": 1,
+  "quick_lists": [],
+  "roles": [],
+  "sequence_id": 100.0,
+  "shortcuts": [
+    {
+      "color": "Grey",
+      "doc_view": "List",
+      "label": "Draft Leads",
+      "link_to": "Lead",
+      "stats_filter": "[[\"Lead\",\"workflow_state\",\"=\",\"Draft\",false]]",
+      "type": "DocType"
+    },
+    {
+      "color": "Grey",
+      "doc_view": "List",
+      "label": "Follow-ups Due",
+      "link_to": "AlphaX Follow-up",
+      "stats_filter": "[[\"AlphaX Follow-up\",\"name\",\"=\",null,false]]",
+      "type": "DocType"
+    },
+    {
+      "color": "Grey",
+      "doc_view": "List",
+      "label": "Lead Data Quality Monitor",
+      "link_to": "Lead Data Quality Monitor",
+      "report_ref_doctype": "Lead",
+      "type": "Report"
+    },
+    {
+      "color": "Red",
+      "doc_view": "List",
+      "label": "Returned for Correction",
+      "link_to": "Lead",
+      "stats_filter": "[[\"Lead\",\"workflow_state\",\"=\",\"Returned for Correction\",false]]",
+      "type": "DocType"
+    },
+    {
+      "color": "Grey",
+      "doc_view": "List",
+      "label": "Follow-ups Due Report",
+      "link_to": "AlphaX Follow-ups Due",
+      "report_ref_doctype": "AlphaX Follow-up",
+      "type": "Report"
+    },
+    {
+      "color": "Orange",
+      "doc_view": "List",
+      "label": "Pending Approvals",
+      "link_to": "Lead",
+      "stats_filter": "[[\"Lead\",\"workflow_state\",\"=\",\"Pending Approval\",false]]",
+      "type": "DocType"
+    },
+    {
+      "color": "Green",
+      "doc_view": "List",
+      "label": "Approved Leads",
+      "link_to": "Lead",
+      "stats_filter": "[[\"Lead\",\"workflow_state\",\"=\",\"Approved\",false]]",
+      "type": "DocType"
+    }
+  ],
+  "title": "AlphaX CRM"
 }

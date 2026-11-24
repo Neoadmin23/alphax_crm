@@ -1,16 +1,4 @@
-"""Quotation-side hooks for AlphaX CRM.
-
-Quotation is a core ERPNext doctype (Selling module), not one this app owns
-— wired via hooks.doc_events, same pattern as Communication/Comment.
-
-Covers the standalone half of WF-02/WF-03 that doesn't depend on a Lead
-being linked to the Quotation at all: whoever holds the Approver role
-should see quotation activity as it happens, full stop. The fuller
-WF-02/03/04 behavior (checking a Quotation exists for a specific Lead,
-confirming its creation back to the Lead Owner, tracking its validity) needs
-an actual Lead<->Quotation link, which doesn't exist in this app yet —
-that's phase 2.
-"""
+"""Quotation close handling and explicit repair for older Lead stages."""
 
 import frappe
 
@@ -47,7 +35,7 @@ def guard_lead_stage(doc, method=None):
     settings = get_settings()
     if not settings.get("guard_quotation_lead_stage", 1):
         return
-    if doc.get("quotation_to") != "Lead" or not doc.get("party_name"):
+    if doc.docstatus != 1:
         return
     # Only step in once the deal itself is off — a normal submit that
     # advances the pipeline SHOULD set Lead Stage to "Quotation"; that's
@@ -60,44 +48,8 @@ def guard_lead_stage(doc, method=None):
     if doc.flags.get("alphax_lost_handled"):
         return
     doc.flags.alphax_lost_handled = True
-    try:
-        from alphax_crm.crm.workflow import quotation_marked_lost
-
-        quotation_marked_lost(doc)
-    except Exception:
-        log_error("guard lead stage after quotation sync")
-
-
-def _restore_lead_stage(doc, settings):
-    if not frappe.db.exists("Lead", doc.party_name):
-        return
-    meta = frappe.get_meta("Lead")
-    if not meta.has_field("status"):
-        return
-    current_stage = frappe.db.get_value("Lead", doc.party_name, "status")
-    # Only correct the specific damage core causes — it only ever forces
-    # the Lead to the generic "Quotation" stage, never anything else — so a
-    # Lead already sitting on some other value (someone's deliberate manual
-    # choice, made after this correction already ran) is left alone.
-    if (current_stage or "").strip().lower() != "quotation":
-        return
-
-    lost_quotation_stage = (settings.get("lost_quotation_stage_value") or "Lost Quotation").strip()
-    if not lost_quotation_stage:
-        return
-
-    from alphax_crm.crm.utils import ensure_select_option
-
-    ensure_select_option("Lead", "status", lost_quotation_stage)
-    frappe.db.set_value("Lead", doc.party_name, "status", lost_quotation_stage, update_modified=False)
-
-    if meta.has_field("won_or_lost_date") and not frappe.db.get_value("Lead", doc.party_name, "won_or_lost_date"):
-        frappe.db.set_value("Lead", doc.party_name, "won_or_lost_date", frappe.utils.nowdate(), update_modified=False)
-
-    from alphax_crm.crm.automation import system_comment
-
-    system_comment("Lead", doc.party_name,
-        f"AlphaX: Lead Stage set to \"{lost_quotation_stage}\" because Quotation {doc.name} was marked Lost.")
+    from alphax_crm.crm.workflow import quotation_marked_lost
+    quotation_marked_lost(doc)
 
 
 @frappe.whitelist()
@@ -124,7 +76,7 @@ def backfill_lead_stage_for_lost_quotations():
     # Lost only: a cancelled quotation is normally being amended and must not close the Lead
     candidates = frappe.get_all(
         "Quotation",
-        filters=[["quotation_to", "=", "Lead"], ["party_name", "is", "set"], ["status", "=", "Lost"]],
+        filters=[["docstatus", "=", 1], ["quotation_to", "=", "Lead"], ["party_name", "is", "set"], ["status", "=", "Lost"]],
         fields=["name", "party_name", "status", "docstatus"],
     )
 
@@ -134,9 +86,10 @@ def backfill_lead_stage_for_lost_quotations():
         if (current_stage or "").strip().lower() != "quotation":
             skipped += 1
             continue
-        doc = frappe._dict(row)
+        doc = frappe.get_doc("Quotation", row.name)
         try:
-            _restore_lead_stage(doc, settings)
+            from alphax_crm.crm.workflow import quotation_marked_lost
+            quotation_marked_lost(doc)
             fixed.append({"quotation": row.name, "lead": row.party_name})
         except Exception:
             log_error("backfill lead stage")

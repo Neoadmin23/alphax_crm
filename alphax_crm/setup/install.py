@@ -38,9 +38,9 @@ def after_install():
 def after_migrate():
     ensure_bi_web_page()
     # Keep config self-healing on every deploy.
-    retire_duplicate_closure_fields()
     cleanup_renamed_bi_reports()
     setup_custom_fields()
+    retire_duplicate_closure_fields()
     ensure_ai_defaults()
     fix_fetch_overwrite_fields()
     setup_accounting_dimensions()
@@ -322,7 +322,6 @@ def ensure_closure_defaults():
     doc = frappe.get_single("AlphaX CRM Settings")
     defaults = {
         "stage_flow_enabled": 1,
-        "stage_flow_bypass_roles": "System Manager,Sales Manager",
         "closure_controls_enabled": 1,
         "won_stage_value": "Won",
         "lost_stage_values": "Lost with reason,Lost Quotation",
@@ -358,6 +357,7 @@ def ensure_wf_defaults():
         "notify_approvers_on_quotation": 1,
         "postponed_stage_value": "Postponed",
         "postponed_default_revisit_days": 30,
+        "postponed_highlight": "Both",
         "lost_quotation_stage_value": "Lost Quotation",
         "lost_quotation_digest_enabled": 1,
         "stage_sla_enabled": 1,
@@ -398,7 +398,8 @@ _OLD_STAGE_MAP = {("lead", "qualified lead"), ("prospect", "quotation"), ("cold 
     ("inactive lead", "lost with reason"), ("successful", "contract under signing"), ("customer", "won")}
 
 
-REPLACED_NOTIFICATIONS = ("AlphaX New Lead Alert", "AlphaX Follow-up Due")
+REPLACED_NOTIFICATIONS = ("AlphaX New Lead Alert", "AlphaX Follow-up Due", "AlphaX Lead Pending Review",
+    "AlphaX Lead Returned for Correction", "AlphaX Lead Approved")
 
 
 def retire_replaced_notifications():
@@ -448,10 +449,25 @@ def upgrade_workflow_defaults():
         settings.set("stage_sla_rules", [dict(zip(("stage", "days", "notify", "require_no_activity", "label",
             "repeat_every_days"), r)) for r in _default_stage_sla_rules()])
         changed = True
+    # 0.45.1: "working hours" now count whole working days by default. The field used to be hidden and
+    # fixed at "Business hours only", so nobody chose that value: flip it once, then leave it to admins.
+    if (not frappe.db.get_default("alphax_working_hours_mode_0451")
+            and settings.meta.has_field("working_hours_mode")):
+        if (settings.get("working_hours_mode") or "Business hours only") == "Business hours only":
+            settings.working_hours_mode = "Working days (24h per day)"
+            changed = True
+        frappe.db.set_default("alphax_working_hours_mode_0451", "1")
     if changed:
         settings.flags.ignore_permissions = True
         settings.flags.ignore_mandatory = True
         settings.save(ignore_permissions=True)
+
+
+def missing_default_sla_rules(existing_rows):
+    """Default WF-05 rules whose (stage, day) is not in the table yet. Rows already there are never
+    compared, changed or removed, so an admin's customised audience/label/repeat for a day is respected."""
+    have = {((r.get("stage") or "").strip().lower(), int(r.get("days") or 0)) for r in existing_rows or []}
+    return [r for r in _default_stage_sla_rules() if (r[0].lower(), int(r[1])) not in have]
 
 
 def seed_email_rules():
@@ -523,6 +539,25 @@ def _seed_monitor_fields():
 # Custom fields  (AlphaX-prefixed so the hooks fixture filter picks them up)
 # ---------------------------------------------------------------------------
 def setup_custom_fields():
+    meta = frappe.get_meta("Lead")
+    required = [
+        {"fieldname": "custom_lead_status", "label": "Lead Status", "fieldtype": "Select",
+         "options": "\nLead\nProspect\nCold Lead\nInactive Lead\nSuccessful\nCustomer", "insert_after": "status"},
+        {"fieldname": "custom_contract", "label": "Contract", "fieldtype": "Select",
+         "options": "\nSigned", "insert_after": "custom_lead_status"},
+        {"fieldname": "won_or_lost_date", "label": "Won Or Lost Date", "fieldtype": "Date", "insert_after": "custom_contract"},
+        {"fieldname": "lost_reason", "label": "Lost Reason", "fieldtype": "Data", "insert_after": "won_or_lost_date"},
+        {"fieldname": "detailed_reason", "label": "Detailed Reason", "fieldtype": "Small Text", "insert_after": "lost_reason"},
+    ]
+    required.append({"fieldname": "alphax_confirmed_postpone_date", "label": "Confirmed Postpone Date",
+                     "fieldtype": "Date", "hidden": 1, "no_copy": 1})
+    from alphax_crm.crm.workflow import CLOSING_FIELDS
+    if not any(meta.has_field(f) for f in CLOSING_FIELDS):
+        required.append({"fieldname": "alphax_expected_closing_date", "label": "Expected Closing Date",
+                         "fieldtype": "Date", "insert_after": "status"})
+    missing = [row for row in required if not meta.has_field(row["fieldname"])]
+    if missing:
+        create_custom_fields({"Lead": missing}, ignore_validate=True)
     fields = {
         "Lead": [
             {
@@ -879,6 +914,14 @@ def setup_custom_fields():
             },
         ],
     }
+    fields.setdefault("Quotation", []).append({
+        "fieldname": "alphax_replaces_quotation", "label": "Replaces Quotation", "fieldtype": "Link",
+        "options": "Quotation", "insert_after": "amended_from", "no_copy": 1,
+    })
+    fields["Lead"].append({"fieldname": "alphax_nba_sources", "label": "Next action evidence", "fieldtype": "Long Text",
+                           "read_only": 1, "hidden": 1, "no_copy": 1, "insert_after": "alphax_ai_next_action"})
+    fields["Lead"].append({"fieldname": "alphax_intent_email", "label": "AI intent source email", "fieldtype": "Link",
+                           "options": "Communication", "read_only": 1, "no_copy": 1, "insert_after": "alphax_ai_intent"})
     create_custom_fields(fields, ignore_validate=True)
 
     # Belt-and-suspenders: create_custom_fields() only reliably updates the

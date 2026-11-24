@@ -95,10 +95,13 @@ def _classify(doc, context, settings):
         f"Intent: {result.get('intent', '-')}\n{result.get('summary', '')}"
     )
     frappe.db.set_value("Lead", doc.name, "alphax_ai_brief", brief, update_modified=False)
+    from alphax_crm.crm.automation import log_action
+    log_action("WF-07 Lead classification saved", doc.name, ("Lead", doc.name), "Lead classification saved")
 
 
 def _draft_reply(doc, context, settings):
-    lang = "Reply bilingually in Arabic and English." if settings.ai_bilingual else "Reply in English."
+    from alphax_crm.ai.sales import lead_language
+    lang = f"Reply in {lead_language(doc.name)}."
     system = (
         "You are a professional Saudi B2B sales rep. Draft a concise, warm first "
         f"response to this inbound lead. {lang} Keep it under 120 words. "
@@ -106,6 +109,8 @@ def _draft_reply(doc, context, settings):
     )
     draft = _chat(system, context, settings, feature="lead_draft_reply", reference=("Lead", doc.name))
     frappe.db.set_value("Lead", doc.name, "alphax_ai_draft_reply", draft, update_modified=False)
+    from alphax_crm.crm.automation import log_action
+    log_action("WF-07 First reply drafted", doc.name, ("Lead", doc.name), "First reply drafted")
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +149,4 @@ def summarize_opportunity(opportunity):
         log_error("ai opportunity brief")
         return None
 
-    frappe.db.set_value("Opportunity", opportunity, "alphax_ai_brief", brief, update_modified=False)
-    frappe.db.commit()
     return brief

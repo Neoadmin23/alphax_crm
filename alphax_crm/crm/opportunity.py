@@ -14,14 +14,8 @@ def validate(doc, method=None):
 
 
 def after_insert(doc, method=None):
-    settings = get_settings()
-    if settings.ai_enabled and settings.ai_summarize_opportunity:
-        frappe.enqueue(
-            "alphax_crm.api.ai.summarize_opportunity",
-            queue="long",
-            opportunity=doc.name,
-            enqueue_after_commit=True,
-        )
+    # Opportunity briefs are generated only when the user requests one.
+    return
 
 
 @frappe.whitelist()
@@ -32,6 +26,7 @@ def refresh_brief(opportunity):
         frappe.throw("AI summarization is disabled in AlphaX CRM Settings.")
     from alphax_crm.api.ai import summarize_opportunity
 
+    frappe.get_doc("Opportunity", opportunity).check_permission("read")
     return summarize_opportunity(opportunity)
 
 

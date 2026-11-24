@@ -288,7 +288,7 @@ def run():
 	q.insert(ignore_permissions=True)
 	q.submit()
 	sales.daily_quotation_watch()
-	check("quotation watch ToDo", frappe.db.exists("ToDo", {"reference_type": "Quotation", "reference_name": q.name,
+	check("quotation watch does not create a ToDo", not frappe.db.exists("ToDo", {"reference_type": "Quotation", "reference_name": q.name,
 		"description": ("like", "[AlphaX AI]%")}))
 	check("quotation reminder draft", frappe.db.exists("AlphaX Email Draft", {"reference_name": q.name, "purpose": "Quotation Reminder"}))
 	sales.daily_quotation_watch()

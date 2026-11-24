@@ -1,3 +1,7 @@
+## Historical audit of version 0.41
+
+For the current source review, verification results and site acceptance criteria, see docs/Approved_Lead_Workflow.md. Historical test counts below describe an earlier release.
+
 # AlphaX CRM 0.41 — compliance with the approved Lead workflow
 
 Status per requirement after the 0.41 audit. "Before" is what 0.39/0.40 did. Every "Now" item is covered by an

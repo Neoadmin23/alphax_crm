@@ -1,6 +1,8 @@
-# AlphaX CRM Automation
+# AlphaX CRM v0.45.1
 
-**Version 0.41.0** · Frappe / ERPNext v15 · © Neotec Integrated Solutions
+[Sales desk, executive analytics and staging acceptance for v0.45.0](docs/Sales_Desk_0_45.md)
+
+**Version 0.45.1** · Frappe / ERPNext v15 · © Neotec Integrated Solutions
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 Compliance-grade CRM automation for **AlphaX** on Frappe/ERPNext v15.
