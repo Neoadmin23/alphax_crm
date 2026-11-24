@@ -448,10 +448,25 @@ def upgrade_workflow_defaults():
         settings.set("stage_sla_rules", [dict(zip(("stage", "days", "notify", "require_no_activity", "label",
             "repeat_every_days"), r)) for r in _default_stage_sla_rules()])
         changed = True
+    # 0.45.1: "working hours" now count whole working days by default. The field used to be hidden and
+    # fixed at "Business hours only", so nobody chose that value: flip it once, then leave it to admins.
+    if (not frappe.db.get_default("alphax_working_hours_mode_0451")
+            and settings.meta.has_field("working_hours_mode")):
+        if (settings.get("working_hours_mode") or "Business hours only") == "Business hours only":
+            settings.working_hours_mode = "Working days (24h per day)"
+            changed = True
+        frappe.db.set_default("alphax_working_hours_mode_0451", "1")
     if changed:
         settings.flags.ignore_permissions = True
         settings.flags.ignore_mandatory = True
         settings.save(ignore_permissions=True)
+
+
+def missing_default_sla_rules(existing_rows):
+    """Default WF-05 rules whose (stage, day) is not in the table yet. Rows already there are never
+    compared, changed or removed, so an admin's customised audience/label/repeat for a day is respected."""
+    have = {((r.get("stage") or "").strip().lower(), int(r.get("days") or 0)) for r in existing_rows or []}
+    return [r for r in _default_stage_sla_rules() if (r[0].lower(), int(r[1])) not in have]
 
 
 def seed_email_rules():
@@ -1047,7 +1062,7 @@ AI_DEFAULTS = {
     "business_days": "Sunday\nMonday\nTuesday\nWednesday\nThursday",
     "business_start": "08:00:00",
     "business_end": "17:00:00",
-    "working_hours_mode": "Business hours only",
+    "working_hours_mode": "Working days (24h per day)",
     "business_hours_only": 1,
     "notify_by_email": 1,
     "protect_lead_stage": 1,

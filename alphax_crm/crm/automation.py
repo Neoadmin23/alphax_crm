@@ -104,7 +104,7 @@ def calendar(settings=None):
 		start=_time(settings.get("business_start"), time(8, 0)),
 		end=_time(settings.get("business_end"), time(17, 0)),
 		holidays=holidays,
-		mode="Business hours only",
+		mode=settings.get("working_hours_mode") or "Working days (24h per day)",
 	)
 
 

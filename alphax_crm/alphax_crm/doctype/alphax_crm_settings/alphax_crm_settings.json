@@ -272,14 +272,12 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "Business hours only",
-   "description": "WF-02: 24 working hours = 1 working day, or count only business hours",
+   "default": "Working days (24h per day)",
+   "description": "Working days (24h per day): 24 working hours = 1 working day, so the WF-02 reminder falls due after 1 working day and the escalation after 3 (Sunday–Thursday, holidays skipped). Business hours only: count just the hours between business start and end (about 9 per day).",
    "fieldname": "working_hours_mode",
    "fieldtype": "Select",
-   "label": "Counting 'Working Hours'",
-   "options": "Working days (24h per day)\nBusiness hours only",
-   "read_only": 1,
-   "hidden": 1
+   "label": "Counting 'Working Hours' (WF-02 reminder / escalation)",
+   "options": "Working days (24h per day)\nBusiness hours only"
   },
   {
    "default": "1",

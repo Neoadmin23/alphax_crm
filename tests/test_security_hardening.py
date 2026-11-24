@@ -28,6 +28,10 @@ class HardeningTests(unittest.TestCase):
         cls.patcher.start()
         for m in ("alphax_crm.api.whatsapp", "alphax_crm.api.ai_setup", "alphax_crm.api.lead_intake"):
             sys.modules.pop(m, None)
+        for m in ("alphax_crm.crm.prelead", "alphax_crm.crm.smart_lead"):
+            sys.modules.pop(m, None)
+        cls.prelead = importlib.import_module("alphax_crm.crm.prelead")
+        cls.smart = importlib.import_module("alphax_crm.crm.smart_lead")
         cls.wa = importlib.import_module("alphax_crm.api.whatsapp")
         cls.setup = importlib.import_module("alphax_crm.api.ai_setup")
         cls.intake = importlib.import_module("alphax_crm.api.lead_intake")
@@ -35,7 +39,8 @@ class HardeningTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.patcher.stop()
-        for m in ("alphax_crm.api.whatsapp", "alphax_crm.api.ai_setup", "alphax_crm.api.lead_intake"):
+        for m in ("alphax_crm.api.whatsapp", "alphax_crm.api.ai_setup", "alphax_crm.api.lead_intake",
+                  "alphax_crm.crm.prelead", "alphax_crm.crm.smart_lead"):
             sys.modules.pop(m, None)
 
     def setUp(self):
@@ -108,6 +113,58 @@ class HardeningTests(unittest.TestCase):
                 out = self.intake.capture()
                 self.assertFalse(out["ok"])
                 self.assertEqual(self.frappe.local.response["http_status_code"], 401)
+
+    # --- AI destination policy -----------------------------------------------------
+    def test_destination_policy(self):
+        ok = ["https://abc.trycloudflare.com", "https://ai.example.com:8443/x", "http://192.168.1.20:11434",
+              "http://10.0.0.5:11434", "http://127.0.0.1:11434", "http://localhost:11434", "http://ollama-box:11434"]
+        bad = ["http://example.com", "http://8.8.8.8:11434", "https://169.254.169.254/latest", "http://169.254.169.254",
+               "https://user:pw@example.com", "ftp://example.com", "javascript:alert(1)", "http://", "not a url",
+               "https://example.com:notaport", "http://0.0.0.0:11434"]
+        for u in ok:
+            self.assertIsNone(self.setup.destination_problem(u), u)
+        for u in bad:
+            self.assertIsNotNone(self.setup.destination_problem(u), u)
+
+    # --- Permission policy -----------------------------------------------------------
+    def _perm_denied(self):
+        self.frappe.has_permission.side_effect = PermissionError("denied")
+
+    def test_prelead_conversion_requires_create_permission_on_both_paths(self):
+        self._perm_denied()
+        doc = MagicMock()
+        for target in ("Lead", "Smart Lead then Lead"):
+            settings = MagicMock()
+            settings.get.side_effect = lambda k, d=None, t=target: t if k == "prospect_convert_target" else d
+            self.frappe.db.exists.return_value = True
+            self.frappe.new_doc.reset_mock()
+            with self.assertRaises(PermissionError):
+                self.prelead._convert_to_lead(doc, settings)
+            self.frappe.new_doc.assert_not_called()
+        self.frappe.has_permission.assert_any_call("Lead", "create", throw=True)
+        self.frappe.has_permission.assert_any_call("AlphaX Smart Lead", "create", throw=True)
+        self.frappe.has_permission.side_effect = None
+
+    def test_manual_smart_lead_sync_checks_the_specific_lead(self):
+        sl = MagicMock(); sl.get.side_effect = lambda k, d=None: {"lead": "LEAD-1"}.get(k, d); sl.lead = "LEAD-1"
+        lead = MagicMock(); lead.check_permission.side_effect = PermissionError("no write on LEAD-1")
+        self.frappe.get_doc.side_effect = lambda dt, name=None: sl if dt == "AlphaX Smart Lead" else lead
+        self.frappe.db.exists.return_value = True
+        with self.assertRaises(PermissionError):
+            self.smart._sync_to_lead("SL-1", check_permissions=True)
+        lead.check_permission.assert_called_once_with("write")
+        self.frappe.get_doc.side_effect = None
+
+    def test_manual_smart_lead_sync_requires_create_for_new_lead(self):
+        sl = MagicMock(); sl.get.return_value = None; sl.lead = None
+        self.frappe.get_doc.side_effect = None
+        self.frappe.get_doc.return_value = sl
+        self._perm_denied()
+        with self.assertRaises(PermissionError):
+            self.smart._sync_to_lead("SL-1", check_permissions=True)
+        self.frappe.has_permission.assert_called_with("Lead", "create", throw=True)
+        self.frappe.new_doc.assert_not_called()
+        self.frappe.has_permission.side_effect = None
 
 
 if __name__ == "__main__":

@@ -148,7 +148,6 @@ def bulk_convert_to_lead(names):
     """
     names = frappe.parse_json(names) if isinstance(names, str) else names
     settings = get_settings()
-    frappe.has_permission("Lead", "create", throw=True)
     converted, failed = [], []
     for name in names:
         doc = frappe.get_doc("AlphaX PreLead", name)
@@ -183,8 +182,13 @@ def _primary_cost_center_splits(doc):
 
 def _convert_to_lead(doc, settings):
     # Optionally route via the Smart Lead data-entry doc (config-driven).
-    if (settings.get("prospect_convert_target") == "Smart Lead then Lead"
-            and frappe.db.exists("DocType", "AlphaX Smart Lead")):
+    via_smart_lead = (settings.get("prospect_convert_target") == "Smart Lead then Lead"
+                      and frappe.db.exists("DocType", "AlphaX Smart Lead"))
+    # Both the status-driven (on_update) and bulk paths insert with permissions
+    # bypassed below, so the acting user must be allowed to create the target.
+    # On the status-driven path a refusal is caught by on_update, which reverts the status.
+    frappe.has_permission("AlphaX Smart Lead" if via_smart_lead else "Lead", "create", throw=True)
+    if via_smart_lead:
         _convert_via_smart_lead(doc, settings)
         return
 
