@@ -1,0 +1,13 @@
+{
+ "actions": [], "allow_rename": 1, "creation": "2026-01-01 00:00:00.000000", "doctype": "DocType",
+ "editable_grid": 1, "engine": "InnoDB", "istable": 1, "module": "AlphaX CRM",
+ "name": "AlphaX Smart Lead Map", "owner": "Administrator",
+ "field_order": ["smart_field", "lead_field", "transform"],
+ "fields": [
+  {"columns": 4, "fieldname": "smart_field", "fieldtype": "Data", "in_list_view": 1, "label": "Smart Lead Field", "reqd": 1},
+  {"columns": 4, "fieldname": "lead_field", "fieldtype": "Data", "in_list_view": 1, "label": "ERPNext Lead Field", "reqd": 1},
+  {"columns": 3, "fieldname": "transform", "fieldtype": "Select", "in_list_view": 1, "label": "Transform", "options": "None\nNormalize Mobile\nTitle Case\nUppercase\nLowercase\nTrim", "default": "None"}
+ ],
+ "links": [], "modified": "2026-01-01 00:00:00.000000", "modified_by": "Administrator",
+ "permissions": [], "sort_field": "modified", "sort_order": "DESC", "states": []
+}

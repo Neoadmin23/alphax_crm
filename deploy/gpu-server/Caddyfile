@@ -1,0 +1,48 @@
+# AlphaX CRM GPU server kit - public entry point.
+# 1. HTTPS with an automatic certificate for {$AI_DOMAIN}
+# 2. Every request needs "Authorization: Bearer {$AI_API_KEY}" (AlphaX sends its API Key this way)
+# 3. Only chat and the model list are forwarded; everything else (ollama pull/delete/create/push,
+#    vLLM admin and metrics endpoints) answers 404.
+{
+	email {$ACME_EMAIL}
+	servers {
+		timeouts {
+			read_body 30s
+			idle 5m
+		}
+	}
+}
+
+{$AI_DOMAIN} {
+	encode zstd gzip
+	header {
+		-Server
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+	}
+	request_body {
+		max_size 2MB
+	}
+	log {
+		output stdout
+		format json
+	}
+
+	route {
+		@no_key not header Authorization "Bearer {$AI_API_KEY}"
+		respond @no_key `{"error":"unauthorized"}` 401 {
+			close
+		}
+
+		# chat = POST only, model list = GET only
+		@allowed expression `(method('POST') && path('/api/chat', '/v1/chat/completions')) || (method('GET') && path('/api/tags', '/v1/models'))`
+		reverse_proxy @allowed {$UPSTREAM} {
+			# model answers can take minutes on long prompts
+			transport http {
+				response_header_timeout 10m
+			}
+		}
+
+		respond `{"error":"not available"}` 404
+	}
+}

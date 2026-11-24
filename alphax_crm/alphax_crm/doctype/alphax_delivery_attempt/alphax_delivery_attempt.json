@@ -1,0 +1,80 @@
+{
+ "doctype": "DocType",
+ "name": "AlphaX Delivery Attempt",
+ "module": "AlphaX CRM",
+ "engine": "InnoDB",
+ "autoname": "hash",
+ "field_order": [
+  "recipient",
+  "channel",
+  "result",
+  "attempted_on",
+  "executed_by",
+  "communication",
+  "email_queue",
+  "error_detail"
+ ],
+ "fields": [
+  {
+   "fieldname": "recipient",
+   "label": "Recipient",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "in_list_view": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "channel",
+   "label": "Channel",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "result",
+   "label": "Result",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "attempted_on",
+   "label": "Time",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "executed_by",
+   "label": "Executed by",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "communication",
+   "label": "Communication",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Communication"
+  },
+  {
+   "fieldname": "email_queue",
+   "label": "Email queue",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Email Queue"
+  },
+  {
+   "fieldname": "error_detail",
+   "label": "Detail",
+   "fieldtype": "Small Text",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "editable_grid": 1,
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "track_changes": 0
+}

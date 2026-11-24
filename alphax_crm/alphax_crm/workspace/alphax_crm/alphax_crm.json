@@ -1,0 +1,282 @@
+{
+ "charts": [],
+ "content": "[{\"id\": \"alphax_header\", \"type\": \"header\", \"data\": {\"text\": \"<span class=\\\"h4\\\">AlphaX CRM Automation</span>\", \"col\": 12}}, {\"id\": \"alphax_desk\", \"type\": \"card\", \"data\": {\"card_name\": \"Sales desk\", \"col\": 4}}, {\"id\": \"alphax_results\", \"type\": \"card\", \"data\": {\"card_name\": \"Executive analytics\", \"col\": 8}}, {\"id\": \"alphax_sc\", \"type\": \"card\", \"data\": {\"card_name\": \"CRM\", \"col\": 4}}, {\"id\": \"alphax_settings_card\", \"type\": \"card\", \"data\": {\"card_name\": \"Configuration\", \"col\": 4}}, {\"id\": \"alphax_ai_card\", \"type\": \"card\", \"data\": {\"card_name\": \"AlphaX AI\", \"col\": 4}}]",
+ "creation": "2026-01-01 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "rocket",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "AlphaX CRM",
+ "links": [
+  {
+   "type": "Card Break",
+   "label": "Sales desk",
+   "link_count": 2
+  },
+  {
+   "type": "Link",
+   "link_type": "Report",
+   "link_to": "AlphaX My Sales Worklist",
+   "label": "My Sales Worklist",
+   "is_query_report": 1
+  },
+  {
+   "type": "Link",
+   "link_type": "Report",
+   "link_to": "AlphaX Manager Exceptions",
+   "label": "Manager Exceptions",
+   "is_query_report": 1
+  },
+  {
+   "type": "Card Break",
+   "label": "Executive analytics",
+   "link_count": 5
+  },
+  {
+   "type": "Link",
+   "link_type": "Report",
+   "link_to": "AlphaX Executive Scorecard",
+   "label": "Executive Scorecard",
+   "is_query_report": 1
+  },
+  {
+   "type": "Link",
+   "link_type": "Report",
+   "link_to": "AlphaX CRM Action History",
+   "label": "CRM Action History",
+   "is_query_report": 1
+  },
+  {
+   "type": "Link",
+   "link_type": "Report",
+   "link_to": "AlphaX Expected Close Forecast",
+   "label": "Expected Close Forecast",
+   "is_query_report": 1
+  },
+  {
+   "type": "Link",
+   "link_type": "Report",
+   "link_to": "AlphaX Forecast Movement",
+   "label": "Forecast Movement",
+   "is_query_report": 1
+  },
+  {
+   "type": "Link",
+   "link_type": "Report",
+   "link_to": "AlphaX Quotation Revisions",
+   "label": "Quotation Revisions",
+   "is_query_report": 1
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "CRM",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Lead Initiation",
+   "link_count": 0,
+   "link_to": "AlphaX Lead Initiation",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PreLead",
+   "link_count": 0,
+   "link_to": "AlphaX PreLead",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Smart Lead",
+   "link_count": 0,
+   "link_to": "AlphaX Smart Lead",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Lead",
+   "link_count": 0,
+   "link_to": "Lead",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Opportunity",
+   "link_count": 0,
+   "link_to": "Opportunity",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Lead Activity Monitor",
+   "link_count": 0,
+   "link_to": "AlphaX Lead Activity Monitor",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Owner Activity Summary",
+   "link_count": 0,
+   "link_to": "AlphaX Owner Activity Summary",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Follow-ups",
+   "link_count": 0,
+   "link_to": "AlphaX Follow-up",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Follow-ups Due",
+   "link_count": 0,
+   "link_to": "AlphaX Follow-ups Due",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Configuration",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AlphaX CRM Settings",
+   "link_count": 0,
+   "link_to": "AlphaX CRM Settings",
+   "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "PreLead Status (Labels)",
+   "link_count": 0,
+   "link_to": "AlphaX PreLead Status",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Score Rules",
+   "link_count": 0,
+   "link_to": "AlphaX Lead Score Rule",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AlphaX AI",
+   "link_count": 0,
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AI Email Drafts",
+   "link_count": 0,
+   "link_to": "AlphaX Email Draft",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AI Terms (Glossary & Dictionary)",
+   "link_count": 0,
+   "link_to": "AlphaX AI Term",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "AI Log",
+   "link_count": 0,
+   "link_to": "AlphaX AI Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-10-28 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "AlphaX CRM",
+ "name": "AlphaX CRM",
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "roles": [],
+ "sequence_id": 100.0,
+ "shortcuts": [
+  {
+   "color": "Purple",
+   "doc_view": "List",
+   "label": "AlphaX CRM Settings",
+   "link_to": "AlphaX CRM Settings",
+   "type": "DocType"
+  },
+  {
+   "color": "Blue",
+   "doc_view": "List",
+   "label": "Leads",
+   "link_to": "Lead",
+   "type": "DocType"
+  },
+  {
+   "color": "Green",
+   "doc_view": "List",
+   "label": "Opportunities",
+   "link_to": "Opportunity",
+   "type": "DocType"
+  }
+ ],
+ "title": "AlphaX CRM"
+}

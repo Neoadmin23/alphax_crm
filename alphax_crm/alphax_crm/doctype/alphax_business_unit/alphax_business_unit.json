@@ -1,0 +1,29 @@
+{
+ "actions": [], "allow_rename": 1, "creation": "2026-01-01 00:00:00.000000", "doctype": "DocType",
+ "editable_grid": 1, "engine": "InnoDB", "istable": 1, "module": "AlphaX CRM",
+ "name": "AlphaX Business Unit", "owner": "Administrator",
+ "field_order": [
+  "business_unit", "lead_description", "column_break_bu", "business_contact", "business_contact_email",
+  "expected_order_value", "payment_terms", "expected_close_date"
+ ],
+ "fields": [
+  {"fieldname": "business_unit", "fieldtype": "Link", "options": "Cost Center", "label": "Business Unit",
+   "in_list_view": 1, "columns": 2},
+  {"fieldname": "lead_description", "fieldtype": "Data", "label": "Lead Description",
+   "in_list_view": 1, "columns": 2},
+  {"fieldname": "column_break_bu", "fieldtype": "Column Break"},
+  {"fieldname": "business_contact", "fieldtype": "Data", "label": "Business Contact & Mobile",
+   "in_list_view": 1, "columns": 2},
+  {"fieldname": "business_contact_email", "fieldtype": "Data", "label": "Business Contact Email",
+   "in_list_view": 1, "columns": 2},
+  {"fieldname": "expected_order_value", "fieldtype": "Float", "label": "Expected Order Value",
+   "in_list_view": 1, "columns": 2},
+  {"fieldname": "payment_terms", "fieldtype": "Data", "label": "Payment Type"},
+  {"fieldname": "expected_close_date", "fieldtype": "Date", "label": "Expected Close Date",
+   "in_list_view": 1, "columns": 2}
+ ],
+ "links": [],
+ "modified": "2026-01-01 00:00:00.000000", "modified_by": "Administrator",
+ "permissions": [],
+ "sort_field": "modified", "sort_order": "DESC", "states": []
+}

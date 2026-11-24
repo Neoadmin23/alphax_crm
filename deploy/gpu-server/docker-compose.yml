@@ -1,0 +1,108 @@
+# AlphaX CRM - GPU server kit: an open model (Ollama or vLLM) behind Caddy.
+#   Caddy: HTTPS certificate (Let's Encrypt) + API key check. Only chat and the model list pass;
+#   model management (pull, delete, create...) is never reachable from the internet.
+#
+#   cp .env.example .env   # set AI_DOMAIN, AI_API_KEY, ENGINE, model
+#   docker compose --profile ollama up -d      # or: --profile vllm
+#   ./check.sh
+#
+# Requires: Docker with the NVIDIA Container Toolkit, an NVIDIA GPU, ports 80/443 open, and a DNS
+# record for AI_DOMAIN pointing at this server.
+
+name: alphax-ai
+
+services:
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      AI_DOMAIN: ${AI_DOMAIN:?set AI_DOMAIN in .env}
+      AI_API_KEY: ${AI_API_KEY:?set AI_API_KEY in .env}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env (for the HTTPS certificate)}
+      # which engine Caddy forwards to (matches the profile you start)
+      UPSTREAM: ${UPSTREAM:-ollama:11434}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [ai]
+
+  # ---------------------------------------------------------------- Ollama (simplest; GGUF models)
+  ollama:
+    profiles: [ollama]
+    image: ollama/ollama:${OLLAMA_VERSION:-latest}
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-24h}      # keep the model loaded: no cold start per request
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-4}    # concurrent CRM users per model
+      OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-16384}
+    volumes:
+      - ollama_models:/root/.ollama
+    # no "ports:": Ollama is reachable only through Caddy on the internal network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks: [ai]
+
+  ollama-pull:
+    # one-shot: downloads the models named in .env, then exits
+    profiles: [ollama]
+    image: ollama/ollama:${OLLAMA_VERSION:-latest}
+    depends_on: [ollama]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        sleep 5
+        for m in ${OLLAMA_MODEL:-qwen3.8:27b} ${OLLAMA_FAST_MODEL:-}; do
+          echo "pulling $$m"; ollama pull "$$m" || exit 1
+        done
+    restart: "no"
+    networks: [ai]
+
+  # ---------------------------------------------------------------- vLLM (highest throughput; HF weights)
+  vllm:
+    profiles: [vllm]
+    image: vllm/vllm-openai:${VLLM_VERSION:-latest}
+    restart: unless-stopped
+    ipc: host
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - hf_cache:/root/.cache/huggingface
+    command:
+      - --model=${VLLM_MODEL:-Qwen/Qwen3.8-27B}
+      - --served-model-name=${VLLM_SERVED_NAME:-qwen3.8-27b}
+      - --max-model-len=${VLLM_MAX_LEN:-32768}
+      - --gpu-memory-utilization=${VLLM_GPU_UTIL:-0.90}
+      - --tensor-parallel-size=${VLLM_TP:-1}
+      # tool calling for other clients (AlphaX itself uses JSON-schema output): confirm the parser on the
+      # model card, e.g. qwen3_coder (Qwen 3.6+), openai (gpt-oss), llama4_pythonic, mistral
+      - --enable-auto-tool-choice
+      - --tool-call-parser=${VLLM_TOOL_PARSER:-qwen3_coder}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    networks: [ai]
+
+volumes:
+  caddy_data:
+  caddy_config:
+  ollama_models:
+  hf_cache:
+
+networks:
+  ai:

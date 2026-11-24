@@ -1,0 +1,109 @@
+{
+ "doctype": "DocType",
+ "name": "AlphaX CRM Action",
+ "module": "AlphaX CRM",
+ "engine": "InnoDB",
+ "autoname": "hash",
+ "field_order": [
+  "occurred_on",
+  "action",
+  "actor_user",
+  "actor_name",
+  "action_source",
+  "initiated_by",
+  "executive",
+  "lead",
+  "reference_doctype",
+  "reference_name",
+  "detail"
+ ],
+ "fields": [
+  {
+   "fieldname": "occurred_on",
+   "label": "Time",
+   "fieldtype": "Datetime",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "action",
+   "label": "Action",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "in_list_view": 1
+  },
+  {
+   "fieldname": "actor_user",
+   "label": "Executed by",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "in_list_view": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "actor_name",
+   "label": "User full name",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "action_source",
+   "label": "Source",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "initiated_by",
+   "label": "Request user",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "executive",
+   "label": "Responsible executive",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "lead",
+   "label": "Lead",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "reference_doctype",
+   "label": "Document type",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "DocType"
+  },
+  {
+   "fieldname": "reference_name",
+   "label": "Document",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "detail",
+   "label": "Detail",
+   "fieldtype": "Small Text",
+   "read_only": 1
+  }
+ ],
+ "istable": 0,
+ "editable_grid": 0,
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "track_changes": 0
+}
