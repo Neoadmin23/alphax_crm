@@ -14,8 +14,7 @@ frappe.ui.form.on("Opportunity", {
                     freeze_message: __("Asking AlphaX AI..."),
                     callback: (r) => {
                         if (r.message) {
-                            frm.reload_doc();
-                            frappe.show_alert({ message: __("AI brief updated"), indicator: "green" });
+                            frappe.msgprint({ title: __("Opportunity brief"), message: frappe.utils.escape_html(r.message) });
                         }
                     },
                 });

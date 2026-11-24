@@ -69,6 +69,13 @@ def _current_assignee(doctype, name):
 def _notify_stale(doctype, name, user, days):
     if not user:
         return
+    if doctype == "Lead":
+        from alphax_crm.crm import automation
+        if not automation.is_paused(name):
+            automation.notify("Stale Lead", [user], lead=name,
+                              subject=f"Lead {name} has had no activity for {days} days",
+                              message="Review the Lead and record the next contact.")
+        return
     frappe.get_doc(
         {
             "doctype": "Notification Log",
@@ -205,12 +212,19 @@ def refresh_activity_monitor():
     today = getdate(nowdate())
     for target in ("Lead", "Opportunity", "AlphaX PreLead"):
         try:
-            records = get_open_records(target, settings, fields=["name", "creation", "alphax_last_activity"])
+            if target == "Lead":
+                from alphax_crm.crm.workflow import SPEC_FLOW, _leads_paged
+                records = _leads_paged({"status": ["in", SPEC_FLOW[:6]]}, ["name", "creation", "alphax_last_activity"])
+            else:
+                records = get_open_records(target, settings, fields=["name", "creation", "alphax_last_activity"])
         except Exception:
             log_error(f"idle refresh fetch: {target}")
             continue
         for r in records:
             anchor = r.get("alphax_last_activity") or r.get("creation")
+            if target == "Lead":
+                from alphax_crm.crm.automation import latest_lead_activity
+                anchor = latest_lead_activity(r["name"], anchor)
             try:
                 idle = max(date_diff(today, getdate(anchor)), 0)
             except Exception:
@@ -275,6 +289,7 @@ def threshold_for(target, status, settings, thresholds=None):
 def backfill_activity_monitor(doctypes=None, limit=0):
     """Seed last-activity fields from the newest existing Communication/Comment
     on each record. Safe to re-run; only fills records with no activity yet."""
+    frappe.only_for(("System Manager", "Sales Manager"))
     if isinstance(doctypes, str):
         import json
         try:
@@ -461,6 +476,8 @@ def notify_overdue_schedules():
 
     by_agent = {}
     for r in latest:
+        if r.get("reference_doctype") == "Lead":
+            continue  # Lead reminders run through the business-hours workflow.
         if not r.get("agent"):
             continue
         overdue_by = date_diff(getdate(today), getdate(r["next_follow_up_date"]))

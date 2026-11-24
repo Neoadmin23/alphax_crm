@@ -117,15 +117,25 @@ def _configuration(settings):
 		_("Missing: {0}").format("; ".join(miss_t)) if miss_t else _("{0} transitions").format(len(have)),
 		fix="transitions" if miss_t else None))
 	out.append(_c("Configuration", _("Stage control enabled (WF-01)"), "ok" if cint(settings.get("stage_flow_enabled", 1)) else "fail",
-		_("Bypass roles: {0}").format(settings.get("stage_flow_bypass_roles") or "-")))
+		_("The approved transitions apply to all sales and manager roles.")))
 	out.append(_c("Configuration", _("Stage protection from ERPNext core"), "ok" if cint(settings.get("protect_lead_stage", 1)) else "warn",
 		_("Without it, a submitted quotation or a new Customer silently resets the Lead Stage")))
 
-	sla_stages = {(r.stage or "").lower() for r in settings.get("stage_sla_rules") or []}
-	miss_s = [s for s in ("Lead", "Interested", "Qualified lead", "Contract Under Signing") if s.lower() not in sla_stages]
-	out.append(_c("Configuration", _("SLA rules (WF-05)"), "warn" if miss_s else "ok",
-		_("No rules for: {0}").format(", ".join(miss_s)) if miss_s else _("{0} rules").format(len(settings.get("stage_sla_rules") or [])),
-		fix="sla" if miss_s else None))
+	from alphax_crm.setup.install import _default_stage_sla_rules, missing_default_sla_rules
+
+	rows = settings.get("stage_sla_rules") or []
+	miss_s = missing_default_sla_rules(rows)
+	default_keys = {(r[0].lower(), int(r[1])) for r in _default_stage_sla_rules()}
+	extra = [f"{r.stage} day {int(r.days or 0)}" for r in rows
+		if ((r.stage or "").strip().lower(), int(r.days or 0)) not in default_keys]
+	if miss_s:
+		detail = _("Missing default rules: {0}. \"Add missing\" adds only these; your existing rows are not changed.").format(
+			", ".join(f"{r[0]} day {r[1]}" for r in miss_s))
+	else:
+		detail = _("{0} rules").format(len(rows))
+	if extra:
+		detail += " " + _("Also kept (not in the approved defaults): {0}.").format(", ".join(extra))
+	out.append(_c("Configuration", _("SLA rules (WF-05)"), "warn" if miss_s else "ok", detail, fix="sla" if miss_s else None))
 	approvers = [u for u in workflow.auto.approvers(settings) if frappe.db.get_value("User", u, "email")]
 	out.append(_c("Configuration", _("Approvers ({0} role)").format(settings.get("approver_role") or "Sales Manager"),
 		"ok" if approvers else "fail", ", ".join(approvers[:6]) or _("No enabled users: escalations have no recipient")))
@@ -364,13 +374,11 @@ def apply_fix(fix):
 				settings.append("stage_transitions", {"from_stage": a, "to_stage": b})
 		settings.save()
 	elif fix == "sla":
-		from alphax_crm.setup.install import _default_stage_sla_rules
+		from alphax_crm.setup.install import missing_default_sla_rules
 
-		have = {(r.stage or "").lower() for r in settings.stage_sla_rules}
-		for row in _default_stage_sla_rules():
-			if row[0].lower() not in have:
-				settings.append("stage_sla_rules", dict(zip(("stage", "days", "notify", "require_no_activity", "label",
-					"repeat_every_days"), row)))
+		for row in missing_default_sla_rules(settings.stage_sla_rules):
+			settings.append("stage_sla_rules", dict(zip(("stage", "days", "notify", "require_no_activity", "label",
+				"repeat_every_days"), row)))
 		settings.save()
 	elif fix == "holidays_next_year":
 		from alphax_crm.crm import holidays

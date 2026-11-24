@@ -3,12 +3,8 @@ frappe.ui.form.on("Quotation", {
     refresh(frm) {
         if (frm.doc.docstatus !== 1 || !frappe.boot.alphax_ai) return;
         frm.add_custom_button(__("Draft Expiry Reminder"), () => {
-            if (!frm.doc.contact_email) {
-                frappe.msgprint(__("This quotation has no contact email."));
-                return;
-            }
             frappe.prompt(
-                [{ fieldname: "language", fieldtype: "Select", label: __("Language"), options: "English\nArabic", default: "English" }],
+                [{ fieldname: "language", fieldtype: "Select", label: __("Language"), options: "\nEnglish\nArabic", description: __("Leave blank to match the lead’s language.") }],
                 (v) => frappe.call({
                     method: "alphax_crm.ai.sales.api_draft_quotation_reminder",
                     args: { quotation: frm.doc.name, language: v.language },

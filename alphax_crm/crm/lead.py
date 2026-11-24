@@ -200,8 +200,9 @@ def sync_lead_stage_options(settings=None):
     if not meta.has_field(_STAGE_TARGET_FIELD):
         return
     changed = False
-    for row in settings.get("lead_stage_map") or []:
-        if ensure_select_option("Lead", _STAGE_TARGET_FIELD, row.lead_stage, clear_cache=False):
+    from alphax_crm.crm.workflow import SPEC_FLOW
+    for stage in SPEC_FLOW:
+        if ensure_select_option("Lead", _STAGE_TARGET_FIELD, stage, clear_cache=False):
             changed = True
     if changed:
         frappe.clear_cache(doctype="Lead")
@@ -318,6 +319,7 @@ def _create_opportunity(doc):
     opp.contact_mobile = doc.get("mobile_no")
     if doc.get("company"):
         opp.company = doc.company
+    opp.flags.alphax_generated = True
     opp.flags.ignore_permissions = True
     opp.insert(ignore_permissions=True)
     doc.add_comment("Comment", text=f"AlphaX: auto-created Opportunity {opp.name} (score {doc.alphax_lead_score}).")
@@ -332,12 +334,9 @@ def on_update(doc, method=None):
 
     _log_workflow_transition(doc, before, settings)
     _seed_postponed_followup(doc, before, settings)
-    try:
-        from alphax_crm.crm import workflow
+    from alphax_crm.crm import workflow
 
-        workflow.lead_on_update(doc, before, settings)
-    except Exception:
-        log_error("workflow on_update")
+    workflow.lead_on_update(doc, before, settings)
 
     if not settings.get("activity_monitor_enabled", 1) or not settings.get("capture_status_change", 1):
         return
@@ -373,11 +372,6 @@ def _seed_postponed_followup(doc, before, settings):
     new_stage = (doc.get("status") or "").strip().lower()
     if new_stage != postponed or old_stage == postponed:
         return
-    if frappe.db.exists("AlphaX Follow-up", {
-        "reference_doctype": "Lead", "reference_name": doc.name, "summary": ["like", "AlphaX: Lead postponed%"],
-        "creation": [">", frappe.utils.add_days(now_datetime(), -1)],
-    }):
-        return  # a blank one is already pending — don't pile up duplicates.
     try:
         fup = frappe.get_doc({
             "doctype": "AlphaX Follow-up",
@@ -388,12 +382,15 @@ def _seed_postponed_followup(doc, before, settings):
             "channel": "Other",
             "summary": "AlphaX: Lead postponed — log the next follow-up here.",
             "next_action": "Follow up on the postponed lead",
-            "next_follow_up_date": doc.get("alphax_next_contact_date"),
+            "next_follow_up_date": None,
         })
         fup.flags.alphax_system = True  # a placeholder, not a contact: never counted as activity
         fup.insert(ignore_permissions=True)
+        from alphax_crm.crm.automation import log_action
+        log_action("WF-05 Postponed follow-up created", doc.name, ("AlphaX Follow-up", fup.name), "Blank follow-up created")
     except Exception:
         log_error("seed postponed follow-up")
+        raise
 
 
 def _log_workflow_transition(doc, before, settings):

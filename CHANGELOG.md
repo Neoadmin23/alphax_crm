@@ -1,3 +1,15 @@
+# 0.45.1 — AlphaX CRM
+
+Aligned release metadata and the Desk heading with the candidate version. The candidate includes webhook and intake hardening, conversion permission checks, follow-up report changes, and configurable SLA hour counting. Its migration selects 24 hours per working day for previously business-hours-only sites. Select Business hours only after migration to retain the previous timing.
+
+# 0.45.0 — Sales desk and executive analytics
+
+Sales worklist, exception resolution and assignment, recipient-specific delivery receipts, user-attributed action history, executive performance, expected-close forecasts, weekly movement and quotation families. See [the guide](docs/Sales_Desk_0_45.md) for scope, metric definitions and staging acceptance.
+
+# 0.44.0 — Approved Lead workflow
+
+See docs/Approved_Lead_Workflow.md for the requirement comparison, changes, release assumptions and staging tests.
+
 # Changelog — AlphaX CRM Automation
 
 All notable changes to `alphax_crm`. Versions follow the app version in

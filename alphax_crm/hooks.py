@@ -1,10 +1,10 @@
 app_name = "alphax_crm"
-app_title = "AlphaX CRM Automation"
+app_title = "AlphaX CRM v0.45.1"
 app_publisher = "Neotec Integrated Solutions"
 app_description = "Compliance-grade CRM automation for AlphaX on Frappe/ERPNext."
 app_email = "support@neotec.ai"
 app_license = "Proprietary"
-app_version = "0.43.0"
+app_version = "0.45.1"
 
 # Requires ERPNext (Lead / Opportunity / CRM doctypes)
 required_apps = ["erpnext"]
@@ -13,6 +13,7 @@ required_apps = ["erpnext"]
 # Global assets
 # ------------------------------------------------------------------------------
 app_include_js = [
+    "/assets/alphax_crm/js/alphax_postponed.js",
     "/assets/alphax_crm/js/alphax_call.js",
     "/assets/alphax_crm/js/alphax_ai_assistant.js",
     "/assets/alphax_crm/js/alphax_ai_writing.js",
@@ -113,7 +114,8 @@ scheduler_events = {
         # WF-04 / WF-05 / lost-quotation digest: 08:00 site time (Asia/Riyadh); each job skips non-working days
         "0 8 * * *": ["alphax_crm.crm.workflow.daily_0800"],
         # WF-02 (24/72 working hours) and notifications queued outside business hours
-        "5 * * * *": ["alphax_crm.crm.workflow.wf02_hourly", "alphax_crm.crm.automation.flush_outbox"],
+        "5 * * * *": ["alphax_crm.crm.workflow.wf02_hourly"],
+        "*/5 * * * *": ["alphax_crm.crm.automation.flush_outbox"],
     },
 }
 
@@ -145,3 +147,25 @@ fixtures = [
         "filters": [["doc_type", "=", "Lead"], ["field_name", "=", "status"], ["property", "=", "options"]],
     },
 ]
+
+# Record the authenticated executor independently of the Lead's commercial owner.
+for _dt, _events in {
+    "AlphaX Smart Lead": ["after_insert", "on_update"], "AlphaX PreLead": ["after_insert", "on_update"],
+    "Customer": ["after_insert", "on_update"],
+    "Lead": ["after_insert", "on_update"], "Opportunity": ["after_insert", "on_update"],
+    "Quotation": ["after_insert", "on_update", "on_submit", "on_cancel", "on_update_after_submit"],
+    "AlphaX Email Draft": ["after_insert", "on_update"], "AlphaX Follow-up": ["after_insert", "on_update"],
+    "Comment": ["after_insert"], "Communication": ["after_insert"],
+    "ToDo": ["after_insert", "on_update"], "Event": ["after_insert", "on_update"],
+}.items():
+    for _event in [*_events, "on_trash"]:
+        _handlers = doc_events.setdefault(_dt, {}).get(_event, [])
+        if isinstance(_handlers, str):
+            _handlers = [_handlers]
+        doc_events[_dt][_event] = [*_handlers, "alphax_crm.crm.action_history.capture"]
+
+doc_events["Quotation"]["validate"] = ["alphax_crm.crm.workflow.quotation_validate", "alphax_crm.crm.commercial.validate_replacement"]
+scheduler_events["daily_long"].append("alphax_crm.crm.commercial.snapshot_forecast")
+doctype_js["AlphaX Automation Log"] = "public/js/automation_log.js"
+doc_events["Quotation"]["on_update"].append("alphax_crm.crm.sales_desk.resolve_missing_quote")
+doc_events["Quotation"]["on_cancel"].append("alphax_crm.crm.sales_desk.reconcile_cancelled_quote")

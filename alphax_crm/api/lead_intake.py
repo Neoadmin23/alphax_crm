@@ -12,10 +12,12 @@ Secure with a shared token in AlphaX CRM Settings (intake_token). Call as:
               "lawful_basis": "Consent"}
 """
 
+import hmac
 import json
 
 import frappe
 from frappe import _
+from frappe.rate_limiter import rate_limit
 from frappe.utils import now_datetime
 
 from alphax_crm.crm.utils import get_settings, log_error
@@ -40,13 +42,14 @@ FIELD_MAP = {
 
 
 @frappe.whitelist(allow_guest=True)
+@rate_limit(limit=120, seconds=60)
 def capture(**kwargs):
     settings = get_settings()
 
     # ---- auth ----
     token = frappe.get_request_header("X-AlphaX-Token")
     expected = settings.get_password("intake_token", raise_exception=False) if settings.intake_token else None
-    if not expected or token != expected:
+    if not expected or not token or not hmac.compare_digest(str(token).encode(), str(expected).encode()):
         frappe.local.response["http_status_code"] = 401
         return {"ok": False, "error": "unauthorized"}
 

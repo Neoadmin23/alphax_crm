@@ -76,14 +76,25 @@ def maybe_sync_to_lead(doc, on_insert=False):
     if not on_insert and not doc.get("lead"):
         return
     try:
-        sync_to_lead(doc.name)
+        _sync_to_lead(doc.name)
     except Exception:
         frappe.log_error(title="AlphaX CRM: smart lead sync", message=frappe.get_traceback())
 
 
 @frappe.whitelist()
 def sync_to_lead(smart_lead):
-    """Create or update the ERPNext Lead from a Smart Lead. Returns lead name."""
+    """Client-callable entry point: checks the caller's permissions, then syncs."""
+    frappe.get_doc("AlphaX Smart Lead", smart_lead).check_permission("write")
+    return _sync_to_lead(smart_lead, check_permissions=True)
+
+
+def _sync_to_lead(smart_lead, check_permissions=False):
+    """Create or update the ERPNext Lead from a Smart Lead. Returns lead name.
+
+    check_permissions=True (manual button): the caller needs create permission for a new
+    Lead, or write permission on the specific Lead being updated.
+    check_permissions=False (Smart Lead save hook): Smart Lead is the data-entry front end
+    for Leads, so the sync deliberately runs elevated for whoever saved the Smart Lead."""
     doc = frappe.get_doc("AlphaX Smart Lead", smart_lead)
     settings = frappe.get_cached_doc("AlphaX CRM Settings")
     lead_meta = frappe.get_meta("Lead")
@@ -91,7 +102,11 @@ def sync_to_lead(smart_lead):
     if doc.get("lead") and frappe.db.exists("Lead", doc.lead):
         lead = frappe.get_doc("Lead", doc.lead)
         creating = False
+        if check_permissions:
+            lead.check_permission("write")
     else:
+        if check_permissions:
+            frappe.has_permission("Lead", "create", throw=True)
         lead = frappe.new_doc("Lead")
         creating = True
 

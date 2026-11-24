@@ -61,13 +61,17 @@ def _receive():
 
     raw = frappe.request.get_data() if frappe.request else b""
 
-    # Signature validation (skipped only if no App Secret configured).
+    # Signature validation is mandatory: without an App Secret anyone could
+    # forge inbound events, so refuse them until the secret is configured.
     app_secret = settings.get_password("whatsapp_app_secret", raise_exception=False)
-    if app_secret:
-        sig = frappe.get_request_header("X-Hub-Signature-256") or ""
-        if not _valid_signature(raw, sig, app_secret):
-            frappe.local.response["http_status_code"] = 401
-            return {"status": "bad_signature"}
+    if not app_secret:
+        log_error("whatsapp webhook rejected: WhatsApp App Secret is not configured in AlphaX CRM Settings")
+        frappe.local.response["http_status_code"] = 401
+        return {"status": "app_secret_not_configured"}
+    sig = frappe.get_request_header("X-Hub-Signature-256") or ""
+    if not _valid_signature(raw, sig, app_secret):
+        frappe.local.response["http_status_code"] = 401
+        return {"status": "bad_signature"}
 
     try:
         payload = json.loads(raw or b"{}")

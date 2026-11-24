@@ -40,6 +40,10 @@ Cloudflare account; that upgrade is intentionally left as a follow-up, not
 bundled into the zero-account "just works" first script.
 """
 
+import hmac
+import ipaddress
+from urllib.parse import urlparse
+
 import frappe
 from frappe import _
 
@@ -150,6 +154,37 @@ def test_ai_connection(base_url=None, chat_path=None, model=None, api_key=None, 
         }
 
 
+def destination_problem(url):
+    """Return why `url` may not be registered as the AI endpoint, or None if it is acceptable.
+
+    Remote hosts must use HTTPS (the setup script's Cloudflare tunnel does). Plain HTTP is
+    only accepted for the local network: loopback / private IPs and single-label or
+    .local/.lan/.internal names. Link-local addresses (cloud metadata, 169.254.x.x) and URLs
+    carrying credentials are never accepted. Named hosts are not DNS-resolved here."""
+    try:
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower()
+        parsed.port  # raises ValueError on a malformed port
+    except ValueError:
+        return "base_url must be a valid http(s) URL"
+    if parsed.scheme not in ("http", "https") or not host:
+        return "base_url must be a valid http(s) URL"
+    if parsed.username or parsed.password:
+        return "base_url must not contain credentials"
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        ip = None
+    if ip is not None and (ip.is_link_local or ip.is_unspecified or ip.is_multicast or ip.is_reserved):
+        return "base_url points to a disallowed address"
+    if parsed.scheme == "https":
+        return None
+    local_name = "." not in host or host.endswith((".local", ".lan", ".internal", ".home.arpa"))
+    if (ip is not None and (ip.is_private or ip.is_loopback)) or (ip is None and local_name):
+        return None
+    return "base_url must use HTTPS unless it is on the local network"
+
+
 # ---------------------------------------------------------------------------
 # Auto-registration callback — called BY the setup script, not the browser.
 # ---------------------------------------------------------------------------
@@ -159,10 +194,15 @@ def register_endpoint(token=None, base_url=None, model=None):
         frappe.throw(_("token and base_url are required"))
     settings = frappe.get_single("AlphaX CRM Settings")
     saved_token = settings.get_password("ai_setup_token") if settings.ai_setup_token else None
-    if not saved_token or token != saved_token:
+    if not saved_token or not hmac.compare_digest(str(token).encode(), str(saved_token).encode()):
         frappe.throw(_("Invalid or expired setup token — download a fresh script from Settings."), frappe.AuthenticationError)
 
-    settings.ai_base_url = base_url.strip()
+    base_url = base_url.strip()
+    problem = destination_problem(base_url)
+    if problem:
+        frappe.throw(_(problem))
+
+    settings.ai_base_url = base_url
     # the setup script always installs Ollama: make sure the provider matches
     if settings.meta.has_field("ai_provider"):
         settings.ai_provider = "Ollama"
@@ -170,6 +210,9 @@ def register_endpoint(token=None, base_url=None, model=None):
     if model:
         settings.ai_model = model.strip()
     settings.ai_enabled = 1
+    # single use: the token in the downloaded script stops working once it has
+    # registered an endpoint (download a fresh script to register another one)
+    settings.ai_setup_token = frappe.generate_hash(length=40)
     settings.save(ignore_permissions=True)
     frappe.db.commit()
     frappe.publish_realtime(
@@ -401,12 +444,12 @@ echo ""
 echo "Public AI endpoint: $TUNNEL_URL"
 printf "Base URL: %s\nModel: %s\nChat Path: /api/chat\n" "$TUNNEL_URL" "$MODEL" > "$CONFIG_DIR/ollama_config.txt"
 
-if curl -s -X POST "__SITE_URL__/api/method/alphax_crm.api.ai_setup.register_endpoint" \
+if RESP=$(curl -fsS -X POST "__SITE_URL__/api/method/alphax_crm.api.ai_setup.register_endpoint" \
   -H "Content-Type: application/json" \
-  -d "{\"token\": \"__TOKEN__\", \"base_url\": \"$TUNNEL_URL\", \"model\": \"$MODEL\"}" >/dev/null; then
+  -d "{\"token\": \"__TOKEN__\", \"base_url\": \"$TUNNEL_URL\", \"model\": \"$MODEL\"}") && printf '%s' "$RESP" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'; then
   echo "AlphaX CRM Settings updated automatically. Setup is complete!"
 else
-  echo "Could not reach AlphaX CRM automatically. Paste this URL into Settings > AI Assist > AI Base URL manually: $TUNNEL_URL"
+  echo "AlphaX CRM did not accept the registration (token expired, rejected, or site unreachable). Download a fresh script from Settings, or paste this URL into Settings > AI Assist > AI Base URL manually: $TUNNEL_URL"
 fi
 
 echo ""
@@ -502,12 +545,12 @@ echo ""
 echo "Public AI endpoint: $TUNNEL_URL"
 printf "Base URL: %s\nModel: %s\nChat Path: /api/chat\n" "$TUNNEL_URL" "$MODEL" > "$CONFIG_DIR/ollama_config.txt"
 
-if curl -s -X POST "__SITE_URL__/api/method/alphax_crm.api.ai_setup.register_endpoint" \
+if RESP=$(curl -fsS -X POST "__SITE_URL__/api/method/alphax_crm.api.ai_setup.register_endpoint" \
   -H "Content-Type: application/json" \
-  -d "{\"token\": \"__TOKEN__\", \"base_url\": \"$TUNNEL_URL\", \"model\": \"$MODEL\"}" >/dev/null; then
+  -d "{\"token\": \"__TOKEN__\", \"base_url\": \"$TUNNEL_URL\", \"model\": \"$MODEL\"}") && printf '%s' "$RESP" | grep -Eq '"ok"[[:space:]]*:[[:space:]]*true'; then
   echo "AlphaX CRM Settings updated automatically. Setup is complete!"
 else
-  echo "Could not reach AlphaX CRM automatically. Paste this URL into Settings > AI Assist > AI Base URL manually: $TUNNEL_URL"
+  echo "AlphaX CRM did not accept the registration (token expired, rejected, or site unreachable). Download a fresh script from Settings, or paste this URL into Settings > AI Assist > AI Base URL manually: $TUNNEL_URL"
 fi
 
 echo ""

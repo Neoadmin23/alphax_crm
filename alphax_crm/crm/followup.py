@@ -90,6 +90,7 @@ def _log_communication(doc):
         "communication_date": doc.follow_up_datetime,
         "status": "Linked",
     })
+    comm.flags.alphax_generated = True
     comm.flags.ignore_permissions = True
     comm.insert(ignore_permissions=True)
 
@@ -109,6 +110,7 @@ def _create_reminder(doc):
         "description": _("Follow up ({0}) — {1}: {2}").format(
             doc.channel, doc.reference_name, doc.next_action or doc.summary or ""),
     })
+    todo.flags.alphax_generated = True
     todo.flags.ignore_permissions = True
     todo.insert(ignore_permissions=True)
 
@@ -132,7 +134,7 @@ def log_followup(reference_doctype, reference_name, channel="Call", direction="O
         "follow_up_datetime": follow_up_datetime or now_datetime(),
         "agent": frappe.session.user,
     })
-    doc.flags.ignore_permissions = True
+    frappe.get_doc(reference_doctype, reference_name).check_permission("write")
     doc.insert(ignore_permissions=True)
     return doc.name
 
@@ -140,6 +142,7 @@ def log_followup(reference_doctype, reference_name, channel="Call", direction="O
 @frappe.whitelist()
 def get_history(reference_doctype, reference_name):
     """Return the follow-up history for a record (newest first)."""
+    frappe.get_doc(reference_doctype, reference_name).check_permission("read")
     return frappe.get_all(
         "AlphaX Follow-up",
         filters={"reference_doctype": reference_doctype, "reference_name": reference_name},

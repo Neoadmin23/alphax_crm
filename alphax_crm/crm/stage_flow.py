@@ -42,9 +42,6 @@ def enforce_stage_flow(doc, settings=None):
     if doc.is_new() or not doc.meta.has_field(_STAGE_FIELD):
         return
 
-    transitions = settings.get("stage_transitions") or []
-    if not transitions:
-        return
 
     if doc.flags.get("alphax_system_stage"):
         return  # a documented system move (e.g. WF-03 Quotation submitted)
@@ -62,21 +59,14 @@ def enforce_stage_flow(doc, settings=None):
         if old_stage.lower() == new_stage.lower():
             return
 
-    bypass_roles = {r.strip() for r in (settings.get("stage_flow_bypass_roles") or "").split(",") if r.strip()}
-    if bypass_roles & set(frappe.get_roles()):
-        return
-
-    allowed = any(
-        (t.from_stage or "").strip().lower() == old_stage.lower()
-        and (t.to_stage or "").strip().lower() == new_stage.lower()
-        for t in transitions
-    )
+    from alphax_crm.setup.install import _default_stage_transitions
+    pair = (old_stage.lower(), new_stage.lower())
+    allowed = pair in {(a.lower(), b.lower()) for a, b in _default_stage_transitions()}
     if not allowed:
         frappe.throw(
             _(
                 'Lead Stage cannot move from "{0}" directly to "{1}" — that skips a step in the '
-                "approved workflow. Move it through the stages in order, or ask a manager to make "
-                "this change."
+                "approved workflow. Move it through the approved stages in order."
             ).format(old_stage, new_stage),
             title=_("Stage Cannot Be Skipped"),
         )
@@ -114,10 +104,9 @@ def enforce_closure_controls(doc, settings=None):
 def _enforce_won(doc, settings):
     missing = []
     contract_signed_value = (settings.get("contract_signed_value") or "Signed").strip()
-    if doc.meta.has_field("custom_contract"):
-        if (doc.get("custom_contract") or "").strip().lower() != contract_signed_value.lower():
-            missing.append(_('Contract must be "{0}"').format(contract_signed_value))
-    if doc.meta.has_field("won_or_lost_date") and not doc.get("won_or_lost_date"):
+    if (doc.get("custom_contract") or "").strip().lower() != contract_signed_value.lower():
+        missing.append(_('Contract must be "{0}"').format(contract_signed_value))
+    if not doc.get("won_or_lost_date"):
         missing.append(_("Won Or Lost Date is required"))
     if settings.get("require_customer_for_won", 1) and doc.name:
         if not frappe.db.exists("Customer", {"lead_name": doc.name}):
@@ -134,11 +123,11 @@ def _enforce_won(doc, settings):
 
 def _enforce_lost(doc, settings):
     missing = []
-    if doc.meta.has_field("lost_reason") and not doc.get("lost_reason"):
+    if not str(doc.get("lost_reason") or "").strip():
         missing.append(_("Lost Reason is required"))
-    if doc.meta.has_field("detailed_reason") and not doc.get("detailed_reason"):
+    if not str(doc.get("detailed_reason") or "").strip():
         missing.append(_("Detailed Reason is required"))
-    if doc.meta.has_field("won_or_lost_date") and not doc.get("won_or_lost_date"):
+    if not doc.get("won_or_lost_date"):
         missing.append(_("Won Or Lost Date is required"))
 
     if missing:

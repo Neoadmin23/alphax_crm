@@ -1,0 +1,94 @@
+{
+ "doctype": "DocType",
+ "name": "AlphaX Forecast Snapshot",
+ "module": "AlphaX CRM",
+ "engine": "InnoDB",
+ "autoname": "hash",
+ "field_order": [
+  "snapshot_key",
+  "week_start",
+  "opportunity",
+  "expected_close",
+  "executive",
+  "currency",
+  "amount",
+  "probability",
+  "executed_by"
+ ],
+ "fields": [
+  {
+   "fieldname": "snapshot_key",
+   "label": "Snapshot key",
+   "fieldtype": "Data",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "week_start",
+   "label": "Week of",
+   "fieldtype": "Date",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "opportunity",
+   "label": "Opportunity",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Opportunity"
+  },
+  {
+   "fieldname": "expected_close",
+   "label": "Expected close",
+   "fieldtype": "Date",
+   "read_only": 1
+  },
+  {
+   "fieldname": "executive",
+   "label": "Sales executive",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "currency",
+   "label": "Currency",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "Currency"
+  },
+  {
+   "fieldname": "amount",
+   "label": "Amount",
+   "fieldtype": "Currency",
+   "read_only": 1,
+   "options": "currency"
+  },
+  {
+   "fieldname": "probability",
+   "label": "Probability",
+   "fieldtype": "Percent",
+   "read_only": 1
+  },
+  {
+   "fieldname": "executed_by",
+   "label": "Executed by",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  }
+ ],
+ "istable": 0,
+ "editable_grid": 0,
+ "permissions": [
+  {
+   "role": "System Manager",
+   "read": 1,
+   "report": 1,
+   "export": 1
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "track_changes": 0
+}

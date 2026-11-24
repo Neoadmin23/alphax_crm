@@ -13,6 +13,7 @@
   "reference_name",
   "trigger_date",
   "dedupe_key",
+  "notification_identity",
   "section_msg",
   "recipients",
   "subject",
@@ -25,7 +26,17 @@
   "sent_on",
   "communication",
   "retries",
-  "result"
+  "result",
+  "actor_user",
+  "actor_name",
+  "action_source",
+  "initiated_by",
+  "delivery_attempts",
+  "assigned_executive",
+  "resolution",
+  "resolution_reference",
+  "resolved_on",
+  "is_sales_exception"
  ],
  "fields": [
   {
@@ -148,6 +159,81 @@
    "fieldname": "result",
    "fieldtype": "Small Text",
    "label": "Result"
+  },
+  {
+   "fieldname": "notification_identity",
+   "fieldtype": "Data",
+   "label": "Notification identity",
+   "description": "SHA-256 of Lead, milestone rule, reference and trigger date.",
+   "unique": 1,
+   "read_only": 1,
+   "no_copy": 1
+  },
+  {
+   "fieldname": "actor_user",
+   "label": "Executed by",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "in_list_view": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "actor_name",
+   "label": "User full name",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "action_source",
+   "label": "Source",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "initiated_by",
+   "label": "Request user",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "delivery_attempts",
+   "label": "Recipient delivery history",
+   "fieldtype": "Table",
+   "read_only": 1,
+   "options": "AlphaX Delivery Attempt"
+  },
+  {
+   "fieldname": "assigned_executive",
+   "label": "Action assigned to",
+   "fieldtype": "Link",
+   "read_only": 1,
+   "options": "User"
+  },
+  {
+   "fieldname": "resolution",
+   "label": "Resolution",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "resolution_reference",
+   "label": "Resolution evidence",
+   "fieldtype": "Data",
+   "read_only": 1
+  },
+  {
+   "fieldname": "resolved_on",
+   "label": "Resolved on",
+   "fieldtype": "Datetime",
+   "read_only": 1
+  },
+  {
+   "fieldname": "is_sales_exception",
+   "label": "Sales exception",
+   "fieldtype": "Check",
+   "read_only": 1,
+   "hidden": 1
   }
  ],
  "in_create": 1,
