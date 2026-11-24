@@ -1,0 +1,1 @@
+# frappe -- this is required for the app to be recognized as a Frappe app

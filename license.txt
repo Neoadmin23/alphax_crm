@@ -1,0 +1,6 @@
+Copyright (c) 2026 Neotec Integrated Solutions
+
+Proprietary software. All rights reserved.
+Licensed for internal use and AlphaX deployments operated by Neotec
+Integrated Solutions / IRSAA Business Solution. Redistribution prohibited
+without written permission. Contact: support@neotec.ai
